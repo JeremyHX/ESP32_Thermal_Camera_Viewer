@@ -18,10 +18,10 @@ uint8_t SPI_Tx_Done = 0;
 
 //private:
 static spi_device_handle_t mHandler;					//SPI handler
-static lldesc_t *dmaDescTx;								//Address of DMA TX descriptor
-static lldesc_t *dmaDescRx;								//Address of DMA RX descriptor
-static int rx_dma_ch;									//RX Channel allocated for a SPI transaction
-static int tx_dma_ch;									//TX Channel allocated for a SPI transaction
+static spi_dma_desc_t *dmaDescTx;						//Address of DMA TX descriptor
+static spi_dma_desc_t *dmaDescRx;						//Address of DMA RX descriptor
+static int rx_dma_ch;									//RX Channel ID allocated for a SPI transaction
+static int tx_dma_ch;									//TX Channel ID allocated for a SPI transaction
 static uint32_t selectSPISpd(const uint8_t sel);		//Select SPI clock speed by selection
 
 /******************************************************************************
@@ -53,10 +53,11 @@ void Drv_SPI_Init(void)
 		ESP_LOGE(STAG,"%s",esp_err_to_name(ret));
 	}// End if-else
 
-	dmaDescTx = spi_bus_get_attr(SPI2_HOST)->dmadesc_tx;						//Obtain the address of DMA TX Descriptor
-	dmaDescRx = spi_bus_get_attr(SPI2_HOST)->dmadesc_rx;						//Obtain the address of DMA RX Descriptor
-	tx_dma_ch = spi_bus_get_attr(SPI2_HOST)->tx_dma_chan;						//Obtain the id of TX channel
-	rx_dma_ch = spi_bus_get_attr(SPI2_HOST)->rx_dma_chan;						//Obtain the id of RX channel
+	const spi_dma_ctx_t *dma_ctx = spi_bus_get_dma_ctx(SPI2_HOST);				//Obtain the DMA context
+	dmaDescTx = dma_ctx->dmadesc_tx;											//Obtain the address of DMA TX Descriptor
+	dmaDescRx = dma_ctx->dmadesc_rx;											//Obtain the address of DMA RX Descriptor
+	gdma_get_channel_id(dma_ctx->tx_dma_chan, &tx_dma_ch);						//Obtain the id of TX channel
+	gdma_get_channel_id(dma_ctx->rx_dma_chan, &rx_dma_ch);						//Obtain the id of RX channel
 
 	ESP_LOGI(STAG,SPI_DMA_INIT,tx_dma_ch,rx_dma_ch);
 	Drv_SPI_DMA_PrepDesc(dummy, dataBuff_dma, DEFAULT_SPI_LENGTH);
@@ -426,11 +427,11 @@ void Drv_SPI_DMA_Disable(void)
  * @return      None
  * @details    Prepare data to DMA descriptor
  *****************************************************************************/
-void Drv_SPI_DMA_PrepDesc(uint16_t *txBuff, uint16_t *rxBuff,const int dataLen)
+void Drv_SPI_DMA_PrepDesc(void *txBuff, void *rxBuff, const int dataLen)
 {
 	const int dma_dataLen = ((dataLen + 7) / 8);						//DMA descriptor data length
 
-	lldesc_setup_link(dmaDescTx, txBuff, dma_dataLen, false);			//Link TX descriptor with buffer.
+	spicommon_dma_desc_setup_link(dmaDescTx, txBuff, dma_dataLen, false);	//Link TX descriptor with buffer.
 	spi_ll_dma_tx_fifo_reset(&GPSPI2);
 
 	spi_ll_outfifo_empty_clr(&GPSPI2);
@@ -441,7 +442,7 @@ void Drv_SPI_DMA_PrepDesc(uint16_t *txBuff, uint16_t *rxBuff,const int dataLen)
 	gdma_ll_tx_start(&GDMA, tx_dma_ch);
 	//end
 
-	lldesc_setup_link(dmaDescRx, rxBuff, dma_dataLen, true);		//Link RX descriptor with buffer.
+	spicommon_dma_desc_setup_link(dmaDescRx, rxBuff, dma_dataLen, true);	//Link RX descriptor with buffer.
 	spi_ll_dma_rx_fifo_reset(&GPSPI2);
 	spi_ll_infifo_full_clr(&GPSPI2);
 	gdma_ll_rx_reset_channel(&GDMA, rx_dma_ch);						//Reset DMA RX Channel

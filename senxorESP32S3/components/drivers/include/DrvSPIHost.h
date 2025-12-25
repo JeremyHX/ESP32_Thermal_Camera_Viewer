@@ -92,7 +92,7 @@ void Drv_SPI_DMA_Disable(void);
 
 void Drv_SPI_DMA_Enable(void);
 
-void Drv_SPI_DMA_PrepDesc(uint16_t *txBuff, uint16_t *rxBuff,const int dataLen);
+void Drv_SPI_DMA_PrepDesc(void *txBuff, void *rxBuff, const int dataLen);
 
 void Read_CalibrationData(void);
 

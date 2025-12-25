@@ -152,7 +152,6 @@ void usbSerialTask(void * pvParameters)
 static void usbSerialTask_Init(void)
 {
     tinyusb_config_cdcacm_t acmCfgObj = {0};
-    acmCfgObj.usb_dev = TINYUSB_USBDEV_0;
     acmCfgObj.cdc_port = TINYUSB_CDC_ACM_0;
     acmCfgObj.callback_rx = &tinyusb_cdc_rx_callback;
 

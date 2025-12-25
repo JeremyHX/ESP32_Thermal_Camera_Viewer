@@ -5,8 +5,7 @@
 #include "esp_log.h"
 
 #include "tinyusb.h"
-#include "tusb_cdc_acm.h"
-#include "common/tusb_types.h"
+#include "tinyusb_cdc_acm.h"
 
 void Drv_USB_Init(void);
 

@@ -14,11 +14,14 @@
  *****************************************************************************/
 void Drv_USB_Init(void)
 {
-    tinyusb_config_t tusb_cfg = {0};
-    tusb_cfg.device_descriptor = NULL;
-    tusb_cfg.string_descriptor = NULL;
-    tusb_cfg.external_phy = false;
-    tusb_cfg.configuration_descriptor = NULL;
+    const tinyusb_config_t tusb_cfg = {
+        .port = TINYUSB_PORT_FULL_SPEED_0,
+        .phy = {0},
+        .task = {0},
+        .descriptor = {0},
+        .event_cb = NULL,
+        .event_arg = NULL,
+    };
 
     tinyusb_driver_install(&tusb_cfg);
 }// Drv_USB_Init
@@ -35,5 +38,5 @@ void Drv_USB_CDC_Init(const tinyusb_config_cdcacm_t *pCfg)
     {
         return;
     }
-    tusb_cdc_acm_init(pCfg);
+    tinyusb_cdcacm_init(pCfg);
 }// Drv_USB_CDC_Init
