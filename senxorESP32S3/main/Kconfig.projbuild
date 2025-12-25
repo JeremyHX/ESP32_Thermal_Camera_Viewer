@@ -40,23 +40,17 @@ menu "SenXor and board settings"
 		choice MI_OP_MODE
 			prompt "ESP32 Operation mode"
 			default MI_OP_MODE_USER
+			help
+				ESP32 operation mode.
+				Configurable by user: User decides whether the EVK worked in USB or WiFi mode.
+				USB Mode: Bridge will communicate with the host via USB only.
+				WiFi Mode: Bridge will communicate with the host via WiFi only.
 			config MI_OP_MODE_USER
 				bool "Configurable by user"
-				help
-					ESP32 will be operated in either USB and WiFi mode configurated by user.
 			config MI_OP_MODE_USB
 				bool "USB Mode"
-				help
-					ESP32 will be operated in USB mode
 			config MI_OP_MODE_WIFI
 				bool "WiFi Mode"
-				help
-					ESP32 will be operated in WiFi mode
-			help
-				ESP32 operation mode
-				Configurable by user: User decides whether the EVK worked in USB or WiFi mode
-				USB Mode: Bridge will communicate with the host via USB only
-				WiFi Mode: Bridge will communicate with the host via WiFi only
 		endchoice
 
 		#GPIO Pins define
