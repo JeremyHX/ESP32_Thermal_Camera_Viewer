@@ -78,6 +78,7 @@ void app_main(void)
 
 
 	ESP32_Peri_Init();																									//Initialise MCU peripherals
+	quadrant_Init();																									//Initialise quadrant analysis
 
 	if(senxorInit() != 0)
 	{

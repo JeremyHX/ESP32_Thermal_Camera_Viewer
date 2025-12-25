@@ -7,6 +7,7 @@
 #include <esp_log.h>				//ESP logger
 #include "Customer_Interface.h"
 #include "DrvLED.h"
+#include "DrvNVS.h"
 #include "MCU_Dependent.h"
 #include "esp_err.h"
 #include "esp_mac.h"
@@ -26,6 +27,7 @@ EXT_RAM_BSS_ATTR QueueHandle_t senxorFrameQueue = NULL;
 TaskHandle_t senxorTaskHandle = NULL;
 //private:
 EXT_RAM_BSS_ATTR static senxorFrame mSenxorFrameObj;
+static quadrantData_t mQuadrantData;  // Quadrant analysis data
 static void senxorTask_Init(void);
 
 
@@ -97,6 +99,7 @@ void senxorTask(void * pvParameters)
 				printSenXorLog(senxorData);
 #endif
 				memcpy(mSenxorFrameObj.mFrame,senxorData,sizeof(mSenxorFrameObj.mFrame));	//Get a copy of thermal frame
+				quadrant_Calculate(senxorData);												//Calculate quadrant analysis values
 				senxorFrame* pSenxorFrameObj = &mSenxorFrameObj;							//Create a pointer to the copy of thermal frame  for sending to queue
 				if(tcpServerGetIsClientConnected())
 				{
@@ -149,4 +152,165 @@ static void senxorTask_Init(void)
 		vTaskDelete(NULL);
 	}
 
+}
+
+/*
+ * ***********************************************************************
+ * @brief       quadrant_Init
+ * @param       None
+ * @return      None
+ * @details     Initialize quadrant analysis, load split values from NVS
+ **************************************************************************/
+void quadrant_Init(void)
+{
+	// Load Xsplit and Ysplit from NVS, use defaults if not found
+	mQuadrantData.Xsplit = NVS_ReadU8("xsplit", DEFAULT_XSPLIT);
+	mQuadrantData.Ysplit = NVS_ReadU8("ysplit", DEFAULT_YSPLIT);
+
+	// Validate ranges
+	if (mQuadrantData.Xsplit > SENXOR_FRAME_WIDTH) {
+		mQuadrantData.Xsplit = DEFAULT_XSPLIT;
+	}
+	if (mQuadrantData.Ysplit > SENXOR_FRAME_HEIGHT) {
+		mQuadrantData.Ysplit = DEFAULT_YSPLIT;
+	}
+
+	// Initialize max/center values to 0
+	mQuadrantData.Amax = 0;
+	mQuadrantData.Acenter = 0;
+	mQuadrantData.Bmax = 0;
+	mQuadrantData.Bcenter = 0;
+	mQuadrantData.Cmax = 0;
+	mQuadrantData.Ccenter = 0;
+	mQuadrantData.Dmax = 0;
+	mQuadrantData.Dcenter = 0;
+
+	ESP_LOGI(SXRTAG, "Quadrant analysis initialized: Xsplit=%d, Ysplit=%d",
+			 mQuadrantData.Xsplit, mQuadrantData.Ysplit);
+}
+
+/*
+ * ***********************************************************************
+ * @brief       quadrant_Calculate
+ * @param       frameData - Pointer to thermal frame data (80x64 pixels)
+ * @return      None
+ * @details     Calculate quadrant max and center values from frame data
+ **************************************************************************/
+void quadrant_Calculate(const uint16_t* frameData)
+{
+	if (frameData == NULL) {
+		return;
+	}
+
+	uint8_t xsplit = mQuadrantData.Xsplit;
+	uint8_t ysplit = mQuadrantData.Ysplit;
+
+	// Reset max values
+	uint16_t Amax = 0, Bmax = 0, Cmax = 0, Dmax = 0;
+
+	// Scan all pixels and find max for each quadrant
+	for (uint8_t y = 0; y < SENXOR_FRAME_HEIGHT; y++) {
+		for (uint8_t x = 0; x < SENXOR_FRAME_WIDTH; x++) {
+			uint16_t pixel = frameData[y * SENXOR_FRAME_WIDTH + x];
+
+			if (x < xsplit && y < ysplit) {
+				// Quadrant A (top-left)
+				if (pixel > Amax) Amax = pixel;
+			} else if (x >= xsplit && y < ysplit) {
+				// Quadrant B (top-right)
+				if (pixel > Bmax) Bmax = pixel;
+			} else if (x < xsplit && y >= ysplit) {
+				// Quadrant C (bottom-left)
+				if (pixel > Cmax) Cmax = pixel;
+			} else {
+				// Quadrant D (bottom-right)
+				if (pixel > Dmax) Dmax = pixel;
+			}
+		}
+	}
+
+	// Calculate center pixel coordinates for each quadrant
+	uint8_t Acx = xsplit / 2;
+	uint8_t Acy = ysplit / 2;
+	uint8_t Bcx = xsplit + (SENXOR_FRAME_WIDTH - xsplit) / 2;
+	uint8_t Bcy = ysplit / 2;
+	uint8_t Ccx = xsplit / 2;
+	uint8_t Ccy = ysplit + (SENXOR_FRAME_HEIGHT - ysplit) / 2;
+	uint8_t Dcx = xsplit + (SENXOR_FRAME_WIDTH - xsplit) / 2;
+	uint8_t Dcy = ysplit + (SENXOR_FRAME_HEIGHT - ysplit) / 2;
+
+	// Clamp center coordinates to valid range
+	if (Acx >= SENXOR_FRAME_WIDTH) Acx = SENXOR_FRAME_WIDTH - 1;
+	if (Acy >= SENXOR_FRAME_HEIGHT) Acy = SENXOR_FRAME_HEIGHT - 1;
+	if (Bcx >= SENXOR_FRAME_WIDTH) Bcx = SENXOR_FRAME_WIDTH - 1;
+	if (Bcy >= SENXOR_FRAME_HEIGHT) Bcy = SENXOR_FRAME_HEIGHT - 1;
+	if (Ccx >= SENXOR_FRAME_WIDTH) Ccx = SENXOR_FRAME_WIDTH - 1;
+	if (Ccy >= SENXOR_FRAME_HEIGHT) Ccy = SENXOR_FRAME_HEIGHT - 1;
+	if (Dcx >= SENXOR_FRAME_WIDTH) Dcx = SENXOR_FRAME_WIDTH - 1;
+	if (Dcy >= SENXOR_FRAME_HEIGHT) Dcy = SENXOR_FRAME_HEIGHT - 1;
+
+	// Store results
+	mQuadrantData.Amax = Amax;
+	mQuadrantData.Acenter = frameData[Acy * SENXOR_FRAME_WIDTH + Acx];
+	mQuadrantData.Bmax = Bmax;
+	mQuadrantData.Bcenter = frameData[Bcy * SENXOR_FRAME_WIDTH + Bcx];
+	mQuadrantData.Cmax = Cmax;
+	mQuadrantData.Ccenter = frameData[Ccy * SENXOR_FRAME_WIDTH + Ccx];
+	mQuadrantData.Dmax = Dmax;
+	mQuadrantData.Dcenter = frameData[Dcy * SENXOR_FRAME_WIDTH + Dcx];
+}
+
+/*
+ * ***********************************************************************
+ * @brief       quadrant_ReadRegister
+ * @param       regAddr - Register address (0xC0-0xC9)
+ * @return      Register value (16-bit for max/center, 8-bit for split)
+ * @details     Read quadrant register value
+ **************************************************************************/
+uint16_t quadrant_ReadRegister(uint8_t regAddr)
+{
+	switch (regAddr) {
+		case REG_XSPLIT:  return mQuadrantData.Xsplit;
+		case REG_YSPLIT:  return mQuadrantData.Ysplit;
+		case REG_AMAX:    return mQuadrantData.Amax;
+		case REG_ACENTER: return mQuadrantData.Acenter;
+		case REG_BMAX:    return mQuadrantData.Bmax;
+		case REG_BCENTER: return mQuadrantData.Bcenter;
+		case REG_CMAX:    return mQuadrantData.Cmax;
+		case REG_CCENTER: return mQuadrantData.Ccenter;
+		case REG_DMAX:    return mQuadrantData.Dmax;
+		case REG_DCENTER: return mQuadrantData.Dcenter;
+		default:          return 0;
+	}
+}
+
+/*
+ * ***********************************************************************
+ * @brief       quadrant_WriteRegister
+ * @param       regAddr - Register address (0xC0 or 0xC1 only)
+ * @param       value - Value to write
+ * @return      None
+ * @details     Write quadrant register (only Xsplit and Ysplit are writable)
+ **************************************************************************/
+void quadrant_WriteRegister(uint8_t regAddr, uint8_t value)
+{
+	switch (regAddr) {
+		case REG_XSPLIT:
+			if (value <= SENXOR_FRAME_WIDTH) {
+				mQuadrantData.Xsplit = value;
+				NVS_WriteU8("xsplit", value);
+				ESP_LOGI(SXRTAG, "Xsplit set to %d", value);
+			}
+			break;
+		case REG_YSPLIT:
+			if (value <= SENXOR_FRAME_HEIGHT) {
+				mQuadrantData.Ysplit = value;
+				NVS_WriteU8("ysplit", value);
+				ESP_LOGI(SXRTAG, "Ysplit set to %d", value);
+			}
+			break;
+		default:
+			// Other registers are read-only
+			break;
+	}
 }

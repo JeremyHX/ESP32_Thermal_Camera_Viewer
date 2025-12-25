@@ -10,6 +10,27 @@
 
 //public:
 extern int ApplicationReadVersion (int Address);
+
+// Quadrant register addresses (from senxorTask.h)
+#define REG_XSPLIT    0xC0
+#define REG_YSPLIT    0xC1
+#define REG_AMAX      0xC2
+#define REG_ACENTER   0xC3
+#define REG_BMAX      0xC4
+#define REG_BCENTER   0xC5
+#define REG_CMAX      0xC6
+#define REG_CCENTER   0xC7
+#define REG_DMAX      0xC8
+#define REG_DCENTER   0xC9
+
+// External quadrant functions (implemented in senxorTask.c)
+extern uint16_t quadrant_ReadRegister(uint8_t regAddr);
+extern void quadrant_WriteRegister(uint8_t regAddr, uint8_t value);
+
+// Helper to check if address is a quadrant register
+static inline bool isQuadrantRegister(int addr) {
+	return (addr >= REG_XSPLIT && addr <= REG_DCENTER);
+}
 /******************************************************************************
  * @brief       getHexValue
  * @param       c - Data to be converted
@@ -268,7 +289,7 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 
 	if(!strcmp((char*) pCmdPhaser->mCmd,CMD_WREG))
 	{
-#if CONFIG_MI_EVK_CP_DBG	
+#if CONFIG_MI_EVK_CP_DBG
 		ESP_LOGI(CPTAG,SP_CMD_WREG_INFO);
 #endif
 		tAddr[0] = pCmdPhaser->mData[0];
@@ -281,8 +302,14 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 
 		tAddrInt = toHex((char*)tAddr);
 		tValInt = toHex((char*)tVal);
-		Acces_Write_Reg(tAddrInt,tValInt);
-		
+
+		// Handle quadrant registers (0xC0-0xC1 are writable)
+		if (isQuadrantRegister(tAddrInt)) {
+			quadrant_WriteRegister(tAddrInt, tValInt);
+		} else {
+			Acces_Write_Reg(tAddrInt,tValInt);
+		}
+
 		pAckBuff[0]=' ';
 		pAckBuff[1]=' ';
 		pAckBuff[2]=' ';
@@ -301,23 +328,45 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 	}
 	else if(!strcmp((char*) pCmdPhaser->mCmd,CMD_RREG))
 	{
-#if CONFIG_MI_EVK_CP_DBG	
+#if CONFIG_MI_EVK_CP_DBG
 		ESP_LOGI(CPTAG,SP_CMD_RREG_INFO);
 #endif
-		uint8_t rd = 0;
 		tAddr[0] = pCmdPhaser->mData[0];
 		tAddr[1] = pCmdPhaser->mData[1];
 		tAddr[2] = 0;
 		tAddrInt = toHex((char*)tAddr);
+
+		// Handle quadrant registers (16-bit values for 0xC2-0xC9, 8-bit for 0xC0-0xC1)
+		if (isQuadrantRegister(tAddrInt)) {
+			uint16_t rd16 = quadrant_ReadRegister(tAddrInt);
+
+			pAckBuff[0]=' ';
+			pAckBuff[1]=' ';
+			pAckBuff[2]=' ';
+			pAckBuff[3]='#';
+			pAckBuff[4]='0';
+			pAckBuff[5]='0';
+			pAckBuff[6]='0';
+			pAckBuff[7]='C';  // Length = 12 (0x0C): 4 cmd + 4 data + 4 CRC
+			pAckBuff[8]='R';
+			pAckBuff[9]='R';
+			pAckBuff[10]='E';
+			pAckBuff[11]='G';
+			sprintf((char *)&pAckBuff[12], "%04X", rd16);
+			sprintf((char *)&pAckBuff[16], "%04X", getCRC(pAckBuff+4,12));
+			pAckBuff[20]=0;
+			return 21;
+		}
+
+		uint8_t rd = 0;
 		if(tAddrInt == 0xB2 || tAddrInt == 0xB3)
 		{
 			rd = ApplicationReadVersion(tAddrInt);
 		}
-		else 
+		else
 		{
 			rd = Acces_Read_Reg(tAddrInt);
 		}
-		
 
 		pAckBuff[0]=' ';
 		pAckBuff[1]=' ';
@@ -333,16 +382,28 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 		pAckBuff[11]='G';
 
 		sprintf((char *)&pAckBuff[12], "%02X", rd);
-		sprintf((char *)&pAckBuff[14], "%04X", getCRC(pAckBuff+4,10));	// Add CRC fieldBuff, 18);
+		sprintf((char *)&pAckBuff[14], "%04X", getCRC(pAckBuff+4,10));	// Add CRC field
 		pAckBuff[18]=0;
 		return 19;
 	}
 	else if (!strcmp((char*) pCmdPhaser->mCmd,CMD_RRSE))
 	{
-		uint8_t tRd = 0;
-		uint16_t tAckLen = (tCmdLenInt - 8 - 2)*2 + 8;  // Len+CMD=8, lastFF=2
 		uint16_t tRegCntX2 = (tCmdLenInt - 8 - 2);
 		uint16_t j = 12;
+
+		// First pass: calculate response length (quadrant regs need 6 bytes, others need 4)
+		uint16_t tAckLen = 8;  // Start with CMD (4) + CRC (4)
+		for (size_t i = 0; i < tRegCntX2; i+=2) {
+			tAddr[0] = pCmdPhaser->mData[i];
+			tAddr[1] = pCmdPhaser->mData[i+1];
+			tAddr[2] = 0;
+			tAddrInt = toHex((char*)tAddr);
+			if (isQuadrantRegister(tAddrInt)) {
+				tAckLen += 6;  // 2 addr + 4 value
+			} else {
+				tAckLen += 4;  // 2 addr + 2 value
+			}
+		}
 
 		pAckBuff[0]=' ';
 		pAckBuff[1]=' ';
@@ -356,26 +417,32 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 		pAckBuff[10]='S';
 		pAckBuff[11]='E';
 
-		for (size_t i = 0; i < tRegCntX2; i+=2,j+=4)
+		for (size_t i = 0; i < tRegCntX2; i+=2)
 		{
 			tAddr[0] = pCmdPhaser->mData[i];
 			tAddr[1] = pCmdPhaser->mData[i+1];
 			tAddr[2] = 0;
 			tAddrInt = toHex((char*)tAddr);
-			if(tAddrInt == 0xB2 || tAddrInt == 0xB3)
-			{
-				tRd = ApplicationReadVersion(tAddrInt);
-			}
-			else 
-			{
-				tRd = Acces_Read_Reg(tAddrInt);
-			}
 
 			sprintf((char *)&pAckBuff[j], "%02X", tAddrInt);
-			sprintf((char *)&pAckBuff[j+2], "%02X", tRd);
+			j += 2;
+
+			if (isQuadrantRegister(tAddrInt)) {
+				uint16_t rd16 = quadrant_ReadRegister(tAddrInt);
+				sprintf((char *)&pAckBuff[j], "%04X", rd16);
+				j += 4;
+			} else if(tAddrInt == 0xB2 || tAddrInt == 0xB3) {
+				uint8_t tRd = ApplicationReadVersion(tAddrInt);
+				sprintf((char *)&pAckBuff[j], "%02X", tRd);
+				j += 2;
+			} else {
+				uint8_t tRd = Acces_Read_Reg(tAddrInt);
+				sprintf((char *)&pAckBuff[j], "%02X", tRd);
+				j += 2;
+			}
 		}// End for
-		
-		sprintf((char *)&pAckBuff[j], "%04X", getCRC(pAckBuff+4,tAckLen));				// Add CRC 
+
+		sprintf((char *)&pAckBuff[j], "%04X", getCRC(pAckBuff+4,tAckLen));				// Add CRC
 
 		return tAckLen + 8;
 	}

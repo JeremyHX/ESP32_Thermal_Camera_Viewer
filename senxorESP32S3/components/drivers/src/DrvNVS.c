@@ -132,6 +132,68 @@ void NVS_ReadInt(const char* key, int32_t value)
 
 /*
  * ***********************************************************************
+ * @brief       NVS_WriteU8
+ * @param       key - Key to locate the value
+ * 				value - uint8_t to be stored
+ * @return      None
+ * @details     Write uint8_t to NVS
+ **************************************************************************/
+void NVS_WriteU8(const char* key, uint8_t value)
+{
+	if(nvs_handler == 0)
+	{
+		ESP_LOGE(NVSTAG,NVS_ERR_HANDLE_NULL);
+		return;
+	}//End if
+	esp_err_t err = nvs_set_u8(nvs_handler, key, value);
+
+	if(err != ESP_OK)
+	{
+		ESP_LOGE(NVSTAG,NVS_ERR_WRITE,esp_err_to_name(err));
+		return;
+	}//End if
+
+	err = nvs_commit(nvs_handler);
+
+	if(err != ESP_OK)
+	{
+		ESP_LOGE(NVSTAG,NVS_ERR_WRITE,esp_err_to_name(err));
+		return;
+	}//End if
+}
+
+/*
+ * ***********************************************************************
+ * @brief       NVS_ReadU8
+ * @param       key - Key to locate the value
+ * 				defaultValue - Default value if key not found
+ * @return      The stored value, or defaultValue if not found
+ * @details     Read uint8_t from NVS
+ **************************************************************************/
+uint8_t NVS_ReadU8(const char* key, uint8_t defaultValue)
+{
+	if(nvs_handler == 0)
+	{
+		return defaultValue;
+	}//End if
+
+	uint8_t value = defaultValue;
+	esp_err_t err = nvs_get_u8(nvs_handler, key, &value);
+
+	switch(err)
+	{
+		case ESP_OK:
+			return value;
+		case ESP_ERR_NVS_NOT_FOUND:
+			return defaultValue;
+		default:
+			ESP_LOGE(NVSTAG,NVS_ERR_RD, esp_err_to_name(err));
+			return defaultValue;
+	}//End switch
+}
+
+/*
+ * ***********************************************************************
  * @brief       NVS_ReadSize
  * @param       key - Key to locate the value
  * @return      Size of the data associated with the key

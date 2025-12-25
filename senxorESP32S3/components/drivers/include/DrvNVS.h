@@ -18,7 +18,11 @@ void NVS_WriteInt(const char* key, const int32_t value);
 
 void NVS_WriteStr(const char* key, const char* value);
 
+void NVS_WriteU8(const char* key, uint8_t value);
+
 void NVS_ReadInt(const char* key, int32_t value);
+
+uint8_t NVS_ReadU8(const char* key, uint8_t defaultValue);
 
 size_t NVS_ReadSize(const char* key);
 
