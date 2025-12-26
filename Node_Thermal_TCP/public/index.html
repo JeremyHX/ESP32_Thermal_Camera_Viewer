@@ -32,9 +32,9 @@
   <canvas id="chartCanvas" width="820" height="200"></canvas>
 
   <div class="controls">
-    <button onclick="saveScreenshot()">📷 Save PNG</button>
-    <button onclick="toggleFullscreen()">🖥 Fullscreen</button>
-    <button onclick="toggleFlip()">↔ Flip</button>
+    <button onclick="saveScreenshot()">Save PNG</button>
+    <button onclick="toggleFullscreen()">Fullscreen</button>
+    <button onclick="toggleFlip()">Flip</button>
 
     <select id="colorMap">
       <option value="default">Default</option>
@@ -47,9 +47,25 @@
     </select>
 
     <select id="tempUnit">
-      <option value="C">Celsius (°C)</option>
-      <option value="F">Fahrenheit (°F)</option>
+      <option value="C">Celsius</option>
+      <option value="F">Fahrenheit</option>
     </select>
+  </div>
+
+  <div class="quadrant-controls">
+    <h3>Quadrant Analysis</h3>
+    <div class="slider-group">
+      <label for="xSplitSlider">X Split: <span id="xSplitValue">40</span></label>
+      <input type="range" id="xSplitSlider" min="1" max="79" value="40">
+    </div>
+    <div class="slider-group">
+      <label for="ySplitSlider">Y Split: <span id="ySplitValue">31</span></label>
+      <input type="range" id="ySplitSlider" min="1" max="61" value="31">
+    </div>
+    <button onclick="resetQuadrantDefaults()">Reset Defaults</button>
+    <label class="checkbox-label">
+      <input type="checkbox" id="showQuadrants" checked> Show Quadrants
+    </label>
   </div>
 
   <div id="hud">
@@ -83,6 +99,13 @@
     const rangeMaxEl = document.getElementById("rangeMax");
     const rangeIndicator = document.getElementById("rangeIndicator");
 
+    // Quadrant controls
+    const xSplitSlider = document.getElementById("xSplitSlider");
+    const ySplitSlider = document.getElementById("ySplitSlider");
+    const xSplitValue = document.getElementById("xSplitValue");
+    const ySplitValue = document.getElementById("ySplitValue");
+    const showQuadrantsCheckbox = document.getElementById("showQuadrants");
+
     const socket = new WebSocket('ws://' + location.host);
     socket.binaryType = 'arraybuffer';
 
@@ -90,6 +113,29 @@
     let lastMessageTime = Date.now();
     let frameCount = 0;
     let flipHorizontally = false;
+
+    // Quadrant state
+    let quadrantConfig = {
+      xSplit: 40,
+      ySplit: 31,
+      aMax: 0, aCenter: 0,
+      bMax: 0, bCenter: 0,
+      cMax: 0, cCenter: 0,
+      dMax: 0, dCenter: 0
+    };
+
+    // Dragging state
+    let isDragging = null; // 'x', 'y', or null
+    const DRAG_THRESHOLD = 15; // pixels from line to start drag
+
+    // Debounce for sending updates
+    let debounceTimer = null;
+    const DEBOUNCE_MS = 200;
+
+    function debounce(fn) {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fn, DEBOUNCE_MS);
+    }
 
     const TIMEOUT_MS = 5000;
 
@@ -104,6 +150,8 @@
       lastMessageTime = Date.now();
       statusEl.textContent = "Connected";
       statusEl.style.color = "#00ff99";
+      // Request current quadrant config
+      socket.send(JSON.stringify({ type: "getQuadrantConfig" }));
     };
 
     socket.onclose = () => {
@@ -113,6 +161,236 @@
 
     function toggleFlip() {
       flipHorizontally = !flipHorizontally;
+    }
+
+    // ============ Quadrant Functions ============
+
+    function updateQuadrantUI() {
+      xSplitSlider.value = quadrantConfig.xSplit;
+      ySplitSlider.value = quadrantConfig.ySplit;
+      xSplitValue.textContent = quadrantConfig.xSplit;
+      ySplitValue.textContent = quadrantConfig.ySplit;
+    }
+
+    function sendXsplit(value) {
+      socket.send(JSON.stringify({ type: "setXsplit", value: value }));
+    }
+
+    function sendYsplit(value) {
+      socket.send(JSON.stringify({ type: "setYsplit", value: value }));
+    }
+
+    function resetQuadrantDefaults() {
+      socket.send(JSON.stringify({ type: "resetDefaults" }));
+    }
+
+    // Slider event handlers with debounce
+    xSplitSlider.addEventListener("input", () => {
+      const val = parseInt(xSplitSlider.value);
+      xSplitValue.textContent = val;
+      quadrantConfig.xSplit = val;
+      debounce(() => sendXsplit(val));
+    });
+
+    ySplitSlider.addEventListener("input", () => {
+      const val = parseInt(ySplitSlider.value);
+      ySplitValue.textContent = val;
+      quadrantConfig.ySplit = val;
+      debounce(() => sendYsplit(val));
+    });
+
+    // ============ Draggable Lines ============
+
+    function getMousePos(e) {
+      const rect = overlay.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * (overlay.width / rect.width),
+        y: (e.clientY - rect.top) * (overlay.height / rect.height)
+      };
+    }
+
+    function pixelToImageCoords(px, py) {
+      const scaleX = overlay.width / width;
+      const scaleY = overlay.height / height;
+      return {
+        imgX: Math.round(px / scaleX),
+        imgY: Math.round(py / scaleY)
+      };
+    }
+
+    function imageToPixelCoords(imgX, imgY) {
+      const scaleX = overlay.width / width;
+      const scaleY = overlay.height / height;
+      return {
+        px: imgX * scaleX,
+        py: imgY * scaleY
+      };
+    }
+
+    overlay.addEventListener("mousedown", (e) => {
+      if (!showQuadrantsCheckbox.checked) return;
+
+      const pos = getMousePos(e);
+      const { px: xLinePos } = imageToPixelCoords(flipHorizontally ? (width - quadrantConfig.xSplit) : quadrantConfig.xSplit, 0);
+      const { py: yLinePos } = imageToPixelCoords(0, quadrantConfig.ySplit);
+
+      // Check if near vertical line (X split)
+      if (Math.abs(pos.x - xLinePos) < DRAG_THRESHOLD) {
+        isDragging = 'x';
+        overlay.style.cursor = 'ew-resize';
+        e.preventDefault();
+        return;
+      }
+
+      // Check if near horizontal line (Y split)
+      if (Math.abs(pos.y - yLinePos) < DRAG_THRESHOLD) {
+        isDragging = 'y';
+        overlay.style.cursor = 'ns-resize';
+        e.preventDefault();
+        return;
+      }
+    });
+
+    overlay.addEventListener("mousemove", (e) => {
+      const pos = getMousePos(e);
+
+      if (isDragging === 'x') {
+        const { imgX } = pixelToImageCoords(pos.x, pos.y);
+        let newX = flipHorizontally ? (width - imgX) : imgX;
+        newX = Math.max(1, Math.min(79, newX));
+        quadrantConfig.xSplit = newX;
+        xSplitSlider.value = newX;
+        xSplitValue.textContent = newX;
+        debounce(() => sendXsplit(newX));
+        return;
+      }
+
+      if (isDragging === 'y') {
+        const { imgY } = pixelToImageCoords(pos.x, pos.y);
+        const newY = Math.max(1, Math.min(63, imgY));
+        quadrantConfig.ySplit = newY;
+        ySplitSlider.value = newY;
+        ySplitValue.textContent = newY;
+        debounce(() => sendYsplit(newY));
+        return;
+      }
+
+      // Update cursor based on proximity to lines
+      if (!showQuadrantsCheckbox.checked) {
+        overlay.style.cursor = 'default';
+        return;
+      }
+
+      const { px: xLinePos } = imageToPixelCoords(flipHorizontally ? (width - quadrantConfig.xSplit) : quadrantConfig.xSplit, 0);
+      const { py: yLinePos } = imageToPixelCoords(0, quadrantConfig.ySplit);
+
+      if (Math.abs(pos.x - xLinePos) < DRAG_THRESHOLD) {
+        overlay.style.cursor = 'ew-resize';
+      } else if (Math.abs(pos.y - yLinePos) < DRAG_THRESHOLD) {
+        overlay.style.cursor = 'ns-resize';
+      } else {
+        overlay.style.cursor = 'default';
+      }
+    });
+
+    overlay.addEventListener("mouseup", () => {
+      isDragging = null;
+      overlay.style.cursor = 'default';
+    });
+
+    overlay.addEventListener("mouseleave", () => {
+      isDragging = null;
+      overlay.style.cursor = 'default';
+    });
+
+    // ============ Draw Quadrant Overlay ============
+
+    function drawQuadrantOverlay(maxX, maxY, maxTemp, unit) {
+      overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+      const scaleX = overlay.width / width;
+      const scaleY = overlay.height / height;
+
+      // Draw max point marker
+      overlayCtx.beginPath();
+      overlayCtx.arc(maxX * scaleX, maxY * scaleY, 8, 0, 2 * Math.PI);
+      overlayCtx.strokeStyle = 'yellow';
+      overlayCtx.lineWidth = 2;
+      overlayCtx.stroke();
+      overlayCtx.font = '16px monospace';
+      overlayCtx.fillStyle = 'yellow';
+      overlayCtx.fillText(maxTemp.toFixed(1) + '°' + unit, maxX * scaleX + 10, maxY * scaleY - 10);
+
+      if (!showQuadrantsCheckbox.checked) return;
+
+      // Calculate line positions (account for flip)
+      const xSplitDisplay = flipHorizontally ? (width - quadrantConfig.xSplit) : quadrantConfig.xSplit;
+      const xLinePos = xSplitDisplay * scaleX;
+      const yLinePos = quadrantConfig.ySplit * scaleY;
+
+      // Draw vertical line (X split)
+      overlayCtx.beginPath();
+      overlayCtx.setLineDash([8, 4]);
+      overlayCtx.moveTo(xLinePos, 0);
+      overlayCtx.lineTo(xLinePos, overlay.height);
+      overlayCtx.strokeStyle = 'cyan';
+      overlayCtx.lineWidth = 2;
+      overlayCtx.stroke();
+
+      // Draw horizontal line (Y split)
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(0, yLinePos);
+      overlayCtx.lineTo(overlay.width, yLinePos);
+      overlayCtx.stroke();
+      overlayCtx.setLineDash([]);
+
+      // Draw quadrant labels with temperatures
+      const quadrants = [
+        { label: 'A', x: xLinePos / 2, y: yLinePos / 2, max: quadrantConfig.aMax, center: quadrantConfig.aCenter },
+        { label: 'B', x: xLinePos + (overlay.width - xLinePos) / 2, y: yLinePos / 2, max: quadrantConfig.bMax, center: quadrantConfig.bCenter },
+        { label: 'C', x: xLinePos / 2, y: yLinePos + (overlay.height - yLinePos) / 2, max: quadrantConfig.cMax, center: quadrantConfig.cCenter },
+        { label: 'D', x: xLinePos + (overlay.width - xLinePos) / 2, y: yLinePos + (overlay.height - yLinePos) / 2, max: quadrantConfig.dMax, center: quadrantConfig.dCenter }
+      ];
+
+      // Swap A/B and C/D labels if flipped
+      if (flipHorizontally) {
+        [quadrants[0], quadrants[1]] = [quadrants[1], quadrants[0]];
+        [quadrants[2], quadrants[3]] = [quadrants[3], quadrants[2]];
+        // Swap positions back
+        quadrants[0].x = xLinePos / 2;
+        quadrants[1].x = xLinePos + (overlay.width - xLinePos) / 2;
+        quadrants[2].x = xLinePos / 2;
+        quadrants[3].x = xLinePos + (overlay.width - xLinePos) / 2;
+      }
+
+      overlayCtx.font = 'bold 14px monospace';
+      overlayCtx.textAlign = 'center';
+
+      quadrants.forEach(q => {
+        const maxT = convertTemp(q.max, unit);
+        const centerT = convertTemp(q.center, unit);
+
+        // Background for readability
+        overlayCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        overlayCtx.fillRect(q.x - 50, q.y - 25, 100, 50);
+
+        // Quadrant label
+        overlayCtx.fillStyle = 'cyan';
+        overlayCtx.fillText(q.label, q.x, q.y - 10);
+
+        // Max temp
+        overlayCtx.fillStyle = '#ff6666';
+        overlayCtx.font = '12px monospace';
+        overlayCtx.fillText(`Max: ${maxT.toFixed(1)}°${unit}`, q.x, q.y + 5);
+
+        // Center temp
+        overlayCtx.fillStyle = '#66ff66';
+        overlayCtx.fillText(`Ctr: ${centerT.toFixed(1)}°${unit}`, q.x, q.y + 20);
+
+        overlayCtx.font = 'bold 14px monospace';
+      });
+
+      overlayCtx.textAlign = 'left';
     }
 
     function rawToCelsius(raw) {
@@ -225,6 +503,20 @@
 
     socket.onmessage = (event) => {
       lastMessageTime = Date.now();
+
+      // Handle JSON messages (quadrant config)
+      if (typeof event.data === 'string') {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'quadrant') {
+            quadrantConfig = msg.data;
+            updateQuadrantUI();
+          }
+        } catch (e) {}
+        return;
+      }
+
+      // Handle binary frame data
       const now = performance.now();
       const latency = now - lastFrameTime;
       lastFrameTime = now;
@@ -244,17 +536,12 @@
       const rawY = Math.floor(maxIndexRaw / width);
       const maxX = flipHorizontally ? (width - 1 - rawX) : rawX;
       const maxY = rawY;
-      const scaleX = 10, scaleY = 10;
 
       const minTemp = convertTemp(minRaw, unit);
       const maxTemp = convertTemp(maxRaw, unit);
 
-
-
-
       rangeMinEl.textContent = `${minTemp.toFixed(1)} °${unit}`;
       rangeMaxEl.textContent = `${maxTemp.toFixed(1)} °${unit}`;
-
 
       const imageData = ctx.createImageData(width, height);
       for (let y = 0; y < height; y++) {
@@ -305,15 +592,8 @@
       }
       ctx.putImageData(imageData, 0, 0);
 
-      overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
-      overlayCtx.beginPath();
-      overlayCtx.arc(maxX * scaleX, maxY * scaleY, 8, 0, 2 * Math.PI);
-      overlayCtx.strokeStyle = 'yellow';
-      overlayCtx.lineWidth = 2;
-      overlayCtx.stroke();
-      overlayCtx.font = '16px monospace';
-      overlayCtx.fillStyle = 'yellow';
-      overlayCtx.fillText(maxTemp.toFixed(1) + '°' + unit, maxX * scaleX + 10, maxY * scaleY - 10);
+      // Draw quadrant overlay with lines and labels
+      drawQuadrantOverlay(maxX, maxY, maxTemp, unit);
 
       tempChart.data.datasets[0].data.push(minTemp);
       tempChart.data.datasets[1].data.push(maxTemp);

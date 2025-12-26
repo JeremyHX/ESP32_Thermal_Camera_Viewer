@@ -45,7 +45,7 @@ canvas#overlayCanvas {
   left: 0;
   width: 800px;
   height: 620px;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .rangeWrapper {
@@ -121,6 +121,90 @@ select {
 button:hover {
   background-color: #00ffcc;
   color: #111;
+}
+
+/* Quadrant Controls */
+.quadrant-controls {
+  margin-top: 20px;
+  padding: 15px 25px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.quadrant-controls h3 {
+  margin: 0;
+  color: #00ffcc;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.slider-group label {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.slider-group label span {
+  color: #00ffcc;
+  font-weight: bold;
+  min-width: 24px;
+  display: inline-block;
+}
+
+.slider-group input[type="range"] {
+  width: 120px;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #333;
+  border-radius: 3px;
+  outline: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #00ffcc;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-group input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #00ffcc;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #00ffcc;
+  cursor: pointer;
 }
 
 #hud {
