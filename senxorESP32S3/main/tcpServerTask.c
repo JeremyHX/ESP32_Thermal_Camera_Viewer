@@ -102,8 +102,8 @@ void tcpServerTask(void * pvParameters)
 			xSemaphoreTake(tcpServerSemaphore, portMAX_DELAY);
 			//tcpServerSend(mTxBuff,mTxPacketSize); 
 
-			printf("Sending thermal frame: %d bytes\n", 80 * 64 * sizeof(uint16_t));  // Will print 10240
-			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 64 * sizeof(uint16_t));  // Send 10240 bytes
+			printf("Sending thermal frame: %d bytes\n", 80 * 62 * sizeof(uint16_t));  // Will print 9920
+			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 62 * sizeof(uint16_t));  // Send 9920 bytes
 
 			//printf("mTxPacketSize: %d\n", mTxPacketSize);
 			xSemaphoreGive(tcpServerSemaphore);
@@ -499,7 +499,7 @@ void tcpServer_InitThermalBuff(void)
 {
 	memset(mTxBuff,0,PACKET_SIZE);
 	memset(mAckBuff, 0, sizeof(mAckBuff));
-	mMemcpySize = 80 * 64;
+	mMemcpySize = 80 * 62;
 	mTxSize = 10256;
 	mTxPacketSize = mTxSize; 
 	mMemcpyOffset = 12+80*2; 				//(80 words + 4 words)

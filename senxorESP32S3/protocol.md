@@ -40,10 +40,10 @@ Thermal frame data pushed automatically when capturing.
 
 | Field | Size | Description |
 |-------|------|-------------|
-| Thermal Data | 10,240 bytes | 80 × 64 pixels, 16-bit unsigned (little-endian) |
+| Thermal Data | 9,920 bytes | 80 × 62 pixels, 16-bit unsigned (little-endian) |
 
 **Pixel Layout**:
-- Resolution: 80 (width) × 64 (height)
+- Resolution: 80 (width) × 62 (height)
 - Format: `uint16_t` raw sensor values
 - Order: Row-major (left-to-right, top-to-bottom)
 
@@ -139,7 +139,7 @@ Note: Quadrant registers return 4-byte values, others return 2-byte values.
 | Address | Name | R/W | Default | Description |
 |---------|------|-----|---------|-------------|
 | `0xC0` | Xsplit | R/W | 40 | X split point (0-80), persisted to NVS |
-| `0xC1` | Ysplit | R/W | 31 | Y split point (0-64), persisted to NVS |
+| `0xC1` | Ysplit | R/W | 31 | Y split point (0-62), persisted to NVS |
 | `0xC2` | Amax | R | - | Maximum value in quadrant A (16-bit) |
 | `0xC3` | Acenter | R | - | Center pixel value in quadrant A (16-bit) |
 | `0xC4` | Bmax | R | - | Maximum value in quadrant B (16-bit) |
@@ -167,14 +167,14 @@ Ysplit├────────────┼──────────�
      │     C      │       D        │
      │(bottom-left)│(bottom-right) │
      │            │                │
-  64 └────────────┴────────────────┘
+  62 └────────────┴────────────────┘
 ```
 
 **Quadrant Definitions**:
 - **A**: x ∈ [0, Xsplit), y ∈ [0, Ysplit)
 - **B**: x ∈ [Xsplit, 80), y ∈ [0, Ysplit)
-- **C**: x ∈ [0, Xsplit), y ∈ [Ysplit, 64)
-- **D**: x ∈ [Xsplit, 80), y ∈ [Ysplit, 64)
+- **C**: x ∈ [0, Xsplit), y ∈ [Ysplit, 62)
+- **D**: x ∈ [Xsplit, 80), y ∈ [Ysplit, 62)
 
 **Register Values**:
 - `*max`: Highest pixel value in the quadrant
@@ -183,8 +183,8 @@ Ysplit├────────────┼──────────�
 **Center Pixel Coordinates**:
 - Acenter: `(Xsplit/2, Ysplit/2)`
 - Bcenter: `(Xsplit + (80-Xsplit)/2, Ysplit/2)`
-- Ccenter: `(Xsplit/2, Ysplit + (64-Ysplit)/2)`
-- Dcenter: `(Xsplit + (80-Xsplit)/2, Ysplit + (64-Ysplit)/2)`
+- Ccenter: `(Xsplit/2, Ysplit + (62-Ysplit)/2)`
+- Dcenter: `(Xsplit + (80-Xsplit)/2, Ysplit + (62-Ysplit)/2)`
 
 ---
 
