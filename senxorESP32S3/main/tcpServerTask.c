@@ -86,9 +86,9 @@ void tcpServerTask(void * pvParameters)
 	tcpServer_InitThermalBuff();
 	tcpServerStart();																											//Start tcp server
 	tcpServerRestart(0);																										//Start listen to the port
-	//ESP_LOGI(TCPTAG, "Creating tcpServerRecvTask...");
-	//BaseType_t res = xTaskCreate(tcpServerRecvTask, "tcpRecvTask", 8192, NULL, 4, &tcpServerRecvTaskHandle);
-	//ESP_LOGI(TCPTAG, "tcpRecvTask result: %s", res == pdPASS ? "Success" : "Fail");
+	ESP_LOGI(TCPTAG, "Creating tcpServerRecvTask...");
+	BaseType_t res = xTaskCreate(tcpServerRecvTask, "tcpRecvTask", 8192, NULL, 4, &tcpServerRecvTaskHandle);
+	ESP_LOGI(TCPTAG, "tcpRecvTask result: %s", res == pdPASS ? "Success" : "Fail");
 	tcpServerSemaphore = xSemaphoreCreateMutex();
 
 	uint16_t* senxorDataPtr = NULL;

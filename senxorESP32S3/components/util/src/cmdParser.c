@@ -306,6 +306,7 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 		// Handle quadrant registers (0xC0-0xC1 are writable)
 		if (isQuadrantRegister(tAddrInt)) {
 			quadrant_WriteRegister(tAddrInt, tValInt);
+			printf("WREG quadrant register 0x%02X = %d\n", tAddrInt, tValInt);
 		} else {
 			Acces_Write_Reg(tAddrInt,tValInt);
 		}
@@ -339,6 +340,7 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 		// Handle quadrant registers (16-bit values for 0xC2-0xC9, 8-bit for 0xC0-0xC1)
 		if (isQuadrantRegister(tAddrInt)) {
 			uint16_t rd16 = quadrant_ReadRegister(tAddrInt);
+			printf("RREG quadrant register 0x%02X = %u\n", tAddrInt, rd16);
 
 			pAckBuff[0]=' ';
 			pAckBuff[1]=' ';
@@ -429,6 +431,7 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 
 			if (isQuadrantRegister(tAddrInt)) {
 				uint16_t rd16 = quadrant_ReadRegister(tAddrInt);
+				printf("RRSE quadrant register 0x%02X = %u\n", tAddrInt, rd16);
 				sprintf((char *)&pAckBuff[j], "%04X", rd16);
 				j += 4;
 			} else if(tAddrInt == 0xB2 || tAddrInt == 0xB3) {
