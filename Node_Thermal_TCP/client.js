@@ -263,10 +263,10 @@ function connectToESP32(retryDelay = 3000) {
       readQuadrantRegisters();
     }, 500);
 
-    // Start periodic polling for quadrant values (every 500ms)
+    // Start periodic polling for quadrant values (every 1000ms)
     quadrantPollInterval = setInterval(() => {
       readQuadrantRegisters();
-    }, 500);
+    }, 1000);
   });
 
   client.setTimeout(5000); // optional timeout

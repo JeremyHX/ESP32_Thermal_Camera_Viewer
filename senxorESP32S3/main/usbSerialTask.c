@@ -173,7 +173,7 @@ void usbSerialTask_InitThermalBuff(void)
 {
 	memset(mAckBuff,0,CONFIG_TINYUSB_CDC_RX_BUFSIZE);
 	memset(mFrameTxBuff,0,USB_TX_SIZE);                         // Initialise Frame buffers
-	mMemcpySize = 80*62;
+	mMemcpySize = 80*64;
 
 	mTxSize = 10256;
 	mTxPacketSize = mTxSize; 
