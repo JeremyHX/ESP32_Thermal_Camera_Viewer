@@ -12,13 +12,17 @@ const HEADER_ROWS = 1;
 const HEADER_SIZE = FRAME_WIDTH * HEADER_ROWS * 2; // 160 bytes (first row is header)
 const TCP_FRAME_SIZE = FRAME_WIDTH * 64 * 2; // 10240 bytes (80x64 total from ESP32)
 
-let receiveBuffer = Buffer.alloc(0);
-let client = null;
-let reconnectTimeout = null;
+let frameBuffer = Buffer.alloc(0);
+let cmdBuffer = Buffer.alloc(0);
+let frameClient = null;
+let cmdClient = null;
+let frameReconnectTimeout = null;
+let cmdReconnectTimeout = null;
 let quadrantPollInterval = null;
 
 const ESP32_HOST = "192.168.4.213"; // your ESP32 IP
-const ESP32_PORT = 3333;
+const FRAME_PORT = 3333;  // Frame streaming
+const CMD_PORT = 3334;    // Commands (WREG/RREG/RRSE)
 
 // Quadrant state
 let quadrantConfig = {
@@ -57,25 +61,25 @@ function buildRRSE(addresses) {
   return buildPacket("RRSE", data);
 }
 
-function sendToESP32(packet) {
-  if (client && !client.destroyed) {
-    client.write(packet);
+function sendCommand(packet) {
+  if (cmdClient && !cmdClient.destroyed) {
+    cmdClient.write(packet);
   }
 }
 
 function writeRegister(address, value) {
-  sendToESP32(buildWREG(address, value));
+  sendCommand(buildWREG(address, value));
 }
 
 function readRegister(address, callback) {
   pendingReads.set(address, callback);
-  sendToESP32(buildRREG(address));
+  sendCommand(buildRREG(address));
 }
 
 function readQuadrantRegisters() {
   // Read all quadrant registers: C0-C9
   const addresses = [0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9];
-  sendToESP32(buildRRSE(addresses));
+  sendCommand(buildRRSE(addresses));
 }
 
 function parseRRSEResponse(data) {
@@ -203,40 +207,81 @@ function processProtocolPacket(buffer) {
   return { consumed: totalPacketLen, command };
 }
 
-function processData() {
-  // First, check for and process any protocol packets
-  let protocolIdx = findPacketStart(receiveBuffer);
-  while (protocolIdx !== -1 && protocolIdx < receiveBuffer.length) {
-    // Process protocol packet at this position
-    const packetBuffer = receiveBuffer.slice(protocolIdx);
+function processCommandData() {
+  // Process protocol packets from command port
+  let protocolIdx = findPacketStart(cmdBuffer);
+  while (protocolIdx !== -1 && protocolIdx < cmdBuffer.length) {
+    const packetBuffer = cmdBuffer.slice(protocolIdx);
     const result = processProtocolPacket(packetBuffer);
 
     if (result) {
       // Remove the protocol packet from the buffer
-      const before = receiveBuffer.slice(0, protocolIdx);
-      const after = receiveBuffer.slice(protocolIdx + result.consumed);
-      receiveBuffer = Buffer.concat([before, after]);
-      // Look for more protocol packets
-      protocolIdx = findPacketStart(receiveBuffer);
+      const before = cmdBuffer.slice(0, protocolIdx);
+      const after = cmdBuffer.slice(protocolIdx + result.consumed);
+      cmdBuffer = Buffer.concat([before, after]);
+      protocolIdx = findPacketStart(cmdBuffer);
     } else {
-      // Incomplete packet, wait for more data
       break;
     }
   }
+}
 
-  // Process raw thermal frames (ESP32 sends 80x64, first 2 rows are headers)
-  while (receiveBuffer.length >= TCP_FRAME_SIZE) {
-    // Skip header rows, copy actual image data
-    const frame = Buffer.from(receiveBuffer.slice(HEADER_SIZE, HEADER_SIZE + RAW_FRAME_SIZE));
-    receiveBuffer = receiveBuffer.slice(TCP_FRAME_SIZE);
+function processFrameData() {
+  // Process raw thermal frames (ESP32 sends 80x64, first row is header)
+  while (frameBuffer.length >= TCP_FRAME_SIZE) {
+    // Skip header row, copy actual image data
+    const frame = Buffer.from(frameBuffer.slice(HEADER_SIZE, HEADER_SIZE + RAW_FRAME_SIZE));
+    frameBuffer = frameBuffer.slice(TCP_FRAME_SIZE);
     broadcastFrame(frame);
   }
 }
 
-function connectToESP32(retryDelay = 3000) {
-  if (client) {
-    client.destroy();
-    client = null;
+function connectFramePort(retryDelay = 3000) {
+  if (frameClient) {
+    frameClient.destroy();
+    frameClient = null;
+  }
+
+  frameClient = new net.Socket();
+
+  frameClient.connect(FRAME_PORT, ESP32_HOST, () => {
+    console.log(`Connected to ESP32 frame port at ${ESP32_HOST}:${FRAME_PORT}`);
+    frameBuffer = Buffer.alloc(0);
+  });
+
+  frameClient.setTimeout(5000);
+
+  frameClient.on("timeout", () => {
+    console.warn("Frame port connection timed out");
+    frameClient.destroy();
+  });
+
+  frameClient.on("data", (data) => {
+    frameBuffer = Buffer.concat([frameBuffer, data]);
+    processFrameData();
+  });
+
+  frameClient.on("error", (err) => {
+    console.error("Frame port error:", err.message);
+    frameClient.destroy();
+  });
+
+  frameClient.on("close", () => {
+    console.log("Frame port connection closed");
+    if (!frameReconnectTimeout) {
+      frameReconnectTimeout = setTimeout(() => {
+        frameReconnectTimeout = null;
+        console.log("Reconnecting to frame port...");
+        connectFramePort();
+      }, retryDelay);
+    }
+  });
+}
+
+function connectCommandPort(retryDelay = 3000) {
+  if (cmdClient) {
+    cmdClient.destroy();
+    cmdClient = null;
   }
 
   if (quadrantPollInterval) {
@@ -244,14 +289,13 @@ function connectToESP32(retryDelay = 3000) {
     quadrantPollInterval = null;
   }
 
-  client = new net.Socket();
+  cmdClient = new net.Socket();
 
-  client.connect(ESP32_PORT, ESP32_HOST, () => {
-    console.log(`Connected to ESP32 at ${ESP32_HOST}:${ESP32_PORT}`);
-    receiveBuffer = Buffer.alloc(0); // reset buffer
+  cmdClient.connect(CMD_PORT, ESP32_HOST, () => {
+    console.log(`Connected to ESP32 command port at ${ESP32_HOST}:${CMD_PORT}`);
+    cmdBuffer = Buffer.alloc(0);
 
-    // Polling disabled - re-enable once ESP32 receive task is stable
-    /*
+    // Start polling quadrant registers
     setTimeout(() => {
       readQuadrantRegisters();
     }, 500);
@@ -259,37 +303,36 @@ function connectToESP32(retryDelay = 3000) {
     quadrantPollInterval = setInterval(() => {
       readQuadrantRegisters();
     }, 1000);
-    */
   });
 
-  client.setTimeout(5000); // optional timeout
+  cmdClient.setTimeout(10000);
 
-  client.on("timeout", () => {
-    console.warn("TCP connection timed out");
-    client.destroy(); // will trigger 'close'
+  cmdClient.on("timeout", () => {
+    console.warn("Command port connection timed out");
+    cmdClient.destroy();
   });
 
-  client.on("data", (data) => {
-    receiveBuffer = Buffer.concat([receiveBuffer, data]);
-    processData();
+  cmdClient.on("data", (data) => {
+    cmdBuffer = Buffer.concat([cmdBuffer, data]);
+    processCommandData();
   });
 
-  client.on("error", (err) => {
-    console.error("TCP Client Error:", err.message);
-    client.destroy(); // ensure 'close' fires
+  cmdClient.on("error", (err) => {
+    console.error("Command port error:", err.message);
+    cmdClient.destroy();
   });
 
-  client.on("close", () => {
-    console.log("ESP32 TCP connection closed");
+  cmdClient.on("close", () => {
+    console.log("Command port connection closed");
     if (quadrantPollInterval) {
       clearInterval(quadrantPollInterval);
       quadrantPollInterval = null;
     }
-    if (!reconnectTimeout) {
-      reconnectTimeout = setTimeout(() => {
-        reconnectTimeout = null;
-        console.log("Attempting to reconnect to ESP32...");
-        connectToESP32();
+    if (!cmdReconnectTimeout) {
+      cmdReconnectTimeout = setTimeout(() => {
+        cmdReconnectTimeout = null;
+        console.log("Reconnecting to command port...");
+        connectCommandPort();
       }, retryDelay);
     }
   });
@@ -344,7 +387,9 @@ wss.on("connection", (ws) => {
   });
 });
 
-connectToESP32(); // initial connection
+// Connect to both ESP32 ports
+connectFramePort();
+connectCommandPort();
 
 server.listen(8080, () => {
   console.log("🌐 WebSocket/HTTP server ready at http://localhost:8080");
