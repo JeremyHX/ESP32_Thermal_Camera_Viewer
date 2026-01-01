@@ -17,7 +17,8 @@
 //Tasks:
 #include "ledCtrlTask.h"			//LED control task
 #include "senxorTask.h"				//senxorTask
-#include "tcpServerTask.h"			//tcpServerTask
+#include "tcpServerTask.h"			//tcpServerTask (frame streaming)
+#include "cmdServerTask.h"			//cmdServerTask (command handling)
 #include "usbSerialTask.h"			//usbSerialTask
 
 //public:
@@ -49,6 +50,10 @@ extern TaskHandle_t tcpServerTaskHandle;
 EXT_RAM_BSS_ATTR static StackType_t usbSerialTaskStack[USB_TASK_STACK_SIZE];
 static StaticTask_t usbSerialTaskBuffer;
 extern TaskHandle_t usbSerialTaskHandle;
+
+EXT_RAM_BSS_ATTR static StackType_t cmdServerTaskStack[CMD_SERVER_STACK_SIZE];
+static StaticTask_t cmdServerTaskBuffer;
+static TaskHandle_t cmdServerTaskHandle;
 /******************************************************************************
  * @brief       app_main
  * @param       none
@@ -107,7 +112,11 @@ void app_main(void)
 	// //WARNING: Net components should be enabled only after SenXor is initialised.
 	ESP32_Net_Init();
 
-	tcpServerTaskHandle = xTaskCreateStaticPinnedToCore(tcpServerTask, "tcpServerTask", TCP_TASK_STACK_SIZE, NULL, 7, tcpServerTaskStack, &tcpServerTaskBuffer, 0);																					//Free main task from queue
+	// Frame streaming server (port 3333)
+	tcpServerTaskHandle = xTaskCreateStaticPinnedToCore(tcpServerTask, "tcpServerTask", TCP_TASK_STACK_SIZE, NULL, 7, tcpServerTaskStack, &tcpServerTaskBuffer, 0);
+
+	// Command server (port 3334)
+	cmdServerTaskHandle = xTaskCreateStaticPinnedToCore(cmdServerTask, "cmdServerTask", CMD_SERVER_STACK_SIZE, NULL, 6, cmdServerTaskStack, &cmdServerTaskBuffer, 0);
 }
 /******************************************************************************
  * @brief       ESP32_Net_Init

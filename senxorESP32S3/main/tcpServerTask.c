@@ -31,13 +31,10 @@ extern QueueHandle_t senxorFrameQueue;
 TaskHandle_t tcpServerTaskHandle = NULL;						//TCP server handler
 
 //private:
-//Buffers
-EXT_RAM_BSS_ATTR static cmdPhaser 	mCmdPhaserObj;														//Command phaser object
-EXT_RAM_BSS_ATTR static uint8_t 	mRxBuff[128];					//Buffer storing the data from client
-EXT_RAM_BSS_ATTR static uint8_t 	mAckBuff[20];					//Buffer for returning data to host
+//Buffers - command handling moved to cmdServerTask
+EXT_RAM_BSS_ATTR static uint8_t 	mRxBuff[16];					//Small buffer for disconnect detection
 EXT_RAM_BSS_ATTR static uint8_t 	mTxBuff[PACKET_SIZE];			//Buffer holding the thermal data
 
-static uint16_t mAckSize = 0;
 static uint16_t mMemcpySize = 0;
 static uint16_t mMemcpyOffset = 12;
 static uint16_t mTxPacketSize = 0;
@@ -61,13 +58,10 @@ struct sockaddr_storage dest_addr;								//Destination address
 struct sockaddr_storage source_addr; 							// Large enough for both IPv4 or IPv6
 #endif
 static TaskHandle_t tcpServerRecvTaskHandle = NULL;				//TCP receive task handler
-static SemaphoreHandle_t tcpServerSemaphore = NULL;	
 //flags
 static bool isClientConnected = false;							//Indicates if a client is connected to the server
 static bool isServerUp = false;									//Indicates if the server is running
 static bool isFirstRun = true;									//Indicates if it is the first time the server started up
-
-static int tcpServerGet(void);
 
 /*
  * ***********************************************************************
@@ -78,36 +72,28 @@ static int tcpServerGet(void);
  **************************************************************************/
 void tcpServerTask(void * pvParameters)
 {
-	ESP_LOGI(TCPTAG, "Creating tcpServerTask...");
-	//senxorFrame *mSenxorFrameObj;
+	ESP_LOGI(TCPTAG, "Creating tcpServerTask (frame streaming only)...");
 
 	ESP_LOGI(TCPTAG,TCP_INIT_INFO,xPortGetCoreID());
-	cmdParser_Init(&mCmdPhaserObj);
 	tcpServer_InitThermalBuff();
-	tcpServerStart();																											//Start tcp server
+	tcpServerStart();
 
-	// Create semaphore for socket access synchronization
-	tcpServerSemaphore = xSemaphoreCreateMutex();
-
-	// Create receive task - it owns the connection lifecycle (accept, restart)
+	// Create receive task - handles connection lifecycle (accept, disconnect detection)
 	ESP_LOGI(TCPTAG, "Creating tcpServerRecvTask...");
-	BaseType_t res = xTaskCreate(tcpServerRecvTask, "tcpRecvTask", 8192, NULL, 4, &tcpServerRecvTaskHandle);
+	BaseType_t res = xTaskCreate(tcpServerRecvTask, "tcpRecvTask", 4096, NULL, 4, &tcpServerRecvTaskHandle);
 	ESP_LOGI(TCPTAG, "tcpRecvTask result: %s", res == pdPASS ? "Success" : "Fail");
 
 	uint16_t* senxorDataPtr = NULL;
-	
+
 	for(;;)
 	{
 		if(xQueueReceive(senxorFrameQueue, &senxorDataPtr, portMAX_DELAY) && isClientConnected)
 		{
-			xSemaphoreTake(tcpServerSemaphore, portMAX_DELAY);
-			printf("Sending thermal frame: %d bytes\n", 80 * 64 * sizeof(uint16_t));  // 10240 bytes
-			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 64 * sizeof(uint16_t));  // 1 header row + 62 image rows + 1 footer
-			xSemaphoreGive(tcpServerSemaphore);
+			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 64 * sizeof(uint16_t));  // 10240 bytes
 			isFirstRun = false;
-		}// End if
+		}
 		vTaskDelay(1);
-	}//End for
+	}
 
 }//End tcpServerTask
 
@@ -120,7 +106,7 @@ void tcpServerTask(void * pvParameters)
  **************************************************************************/
 void tcpServerRecvTask(void* pvParameters)
 {
-	ESP_LOGI(TCPTAG, ">>>> tcpServerRecvTask started");
+	ESP_LOGI(TCPTAG, ">>>> tcpServerRecvTask started (disconnect detection only)");
 
 	// This task owns the connection lifecycle - do initial accept
 	tcpServerRestart(0);
@@ -130,19 +116,28 @@ void tcpServerRecvTask(void* pvParameters)
 		// If not connected, wait for new connection
 		if (!isClientConnected)
 		{
-			ESP_LOGI(TCPTAG, "Waiting for client connection...");
+			ESP_LOGI(TCPTAG, "Waiting for frame client connection...");
 			tcpServerRestart(0);
 			continue;
 		}
 
-		// Receive and process commands
-		if(tcpServerGet() < 0)
-		{
-			ESP_LOGW(TCPTAG, "tcpServerGet failed, client disconnected");
+		// Just detect disconnect - commands are handled by cmdServerTask on port 3334
+		// Use non-blocking read to check if socket is still alive
+		int len = recv(connect_sock, mRxBuff, sizeof(mRxBuff), MSG_DONTWAIT);
+		if (len == 0) {
+			// Client closed connection gracefully
+			ESP_LOGW(TCPTAG, "Frame client disconnected");
+			isClientConnected = false;
+			Acces_Write_Reg(0xB1, 0x00);  // Stop streaming
+		} else if (len < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+			// Error (not just "would block")
+			ESP_LOGW(TCPTAG, "Frame client connection error: %d", errno);
 			isClientConnected = false;
 			Acces_Write_Reg(0xB1, 0x00);  // Stop streaming
 		}
-		vTaskDelay(pdMS_TO_TICKS(10));
+		// If len > 0, client sent data - ignore it (commands should go to port 3334)
+
+		vTaskDelay(pdMS_TO_TICKS(100));  // Check every 100ms
 	}
 }//End tcpServerRecvTask
 
@@ -408,82 +403,7 @@ bool tcpServerGetIsClientConnected(void)
 	return isClientConnected;
 }//End tcpServerGetIsClientConnected
 
-/*
- * ***********************************************************************
- * @brief       tcpServerGet
- * @param       None
- * @return      No. of bytes read. -1 if error is occurred
- * @details     Read bytes from socket
- **************************************************************************/
-static int tcpServerGet(void)
-{
-
-	ESP_LOGI(TCPTAG, "tcpServerGet()");
-
-	bzero(mRxBuff, 50);
-	ESP_LOGI(TCPTAG, TCP_DATA_REC_WAIT);
-
-#if CONFIG_MI_SER_MODE_TCP
-	int status = read(connect_sock, mRxBuff, 49);								//Wait and read from socket to buffer
-#endif
-
-#if CONFIG_MI_SER_MODE_UDP
-    struct iovec iov;
-    struct msghdr msg;
-    struct cmsghdr *cmsgtmp;
-
-
-    socklen_t socklen = sizeof(source_addr);
-    uint8_t cmsg_buf[CMSG_SPACE(sizeof(struct in_pktinfo))];
-
-    iov.iov_base = mRxBuff;
-    iov.iov_len = sizeof(mRxBuff);
-    msg.msg_control = cmsg_buf;
-    msg.msg_controllen = sizeof(cmsg_buf);
-    msg.msg_flags = 0;
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    msg.msg_name = (struct sockaddr *)&source_addr;
-    msg.msg_namelen = socklen;
-
-    int status = recvmsg(server_sock, &msg, 0);
-#endif
-	ESP_LOGI(TCPTAG, TCP_DATA_REC,mRxBuff);
-
-	/*
-	 * If there is any error during the transmission.
-	 * The TCP server will stop the capture and wait for client again
-	 */
-	if(status < 0)
-	{
-		ESP_LOGE(TCPTAG, TCP_ERR_TRANS, connect_sock,  errno, strerror(errno));
-		switch(errno)
-		{
-			case 104:
-			case 128:
-				Drv_SPI_Senxor_Write_Reg(0xB1,0);
-			break;
-		}//End switch
-	}
-	else
-	{
-		cmdParser_PharseCmd(&mCmdPhaserObj, mRxBuff, 49);
-		mAckSize = cmdParser_CommitCmd(&mCmdPhaserObj, mAckBuff);
-		if(mAckSize != 0)
-		{
-			xSemaphoreTake(tcpServerSemaphore, portMAX_DELAY);
-			tcpServerSend( mAckBuff, mAckSize);
-			xSemaphoreGive(tcpServerSemaphore);
-		}
-
-		cmdParser_Init(&mCmdPhaserObj);
-	}
-	return status;
-}//End tcpServerGet
-
-
-
- /******************************************************************************
+/******************************************************************************
  * @brief       tcpServer_InitThermalBuff
  * @param       pSenxorType - Enum as defined in SenxorType
  * @return      none
@@ -492,7 +412,6 @@ static int tcpServerGet(void)
 void tcpServer_InitThermalBuff(void)
 {
 	memset(mTxBuff,0,PACKET_SIZE);
-	memset(mAckBuff, 0, sizeof(mAckBuff));
 	mMemcpySize = 80 * 64;
 	mTxSize = 10256;
 	mTxPacketSize = mTxSize; 

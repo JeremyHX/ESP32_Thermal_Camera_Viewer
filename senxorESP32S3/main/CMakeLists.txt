@@ -8,7 +8,7 @@ message("Configuring main component...")
 set(COMPONENT_REQUIRES Applications drivers net SenXorLib util soc nvs_flash ulp)
 set(COMPONENT_PRIV_REQUIRES  esp_lcd )
 set(COMPONENT_ADD_INCLUDEDIRS "." "include" )
-set(COMPONENT_SRCS "main.c" "ledCtrlTask.c" "senxorTask.c" "tcpServerTask.c" "usbSerialTask.c") 
+set(COMPONENT_SRCS "main.c" "ledCtrlTask.c" "senxorTask.c" "tcpServerTask.c" "cmdServerTask.c" "usbSerialTask.c") 
 message("Components registered:")
 message(${COMPONENT_REQUIRES})
 

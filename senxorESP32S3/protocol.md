@@ -4,9 +4,16 @@ This document describes the TCP/IP protocol used for communication between the E
 
 ## Connection
 
-- **Transport**: TCP/IP
-- **Default Port**: 3333 (configurable via `CONFIG_MI_TCP_PORT`)
-- **Behavior**: Server pushes thermal frames automatically when a client connects
+The ESP32 uses two separate TCP ports to prevent command responses from interfering with frame streaming:
+
+| Port | Purpose | Description |
+|------|---------|-------------|
+| **3333** | Frame streaming | Thermal frames pushed automatically on connect |
+| **3334** | Commands | WREG/RREG/RRSE commands and responses |
+
+**Client should connect to both ports:**
+1. Connect to port 3333 to receive thermal frame stream
+2. Connect to port 3334 to send commands and receive responses
 
 ## Packet Format
 
@@ -208,11 +215,13 @@ Ysplit├────────────┼──────────�
 ## Connection Flow
 
 ```
-1. Client connects to ESP32:3333
+1. Client connects to ESP32:3333 (frame port)
 2. ESP32 writes 0x03 to register 0xB1 (starts capture)
-3. ESP32 pushes GFRA packets continuously (~10KB each)
-4. Client can send WREG/RREG commands at any time
-5. On disconnect, capture stops (0x00 written to 0xB1)
+3. ESP32 pushes thermal frames continuously (10,240 bytes each)
+4. Client connects to ESP32:3334 (command port)
+5. Client sends WREG/RREG/RRSE commands on port 3334
+6. ESP32 responds on port 3334 (no interference with frames)
+7. On frame port disconnect, capture stops (0x00 written to 0xB1)
 ```
 
 ---
