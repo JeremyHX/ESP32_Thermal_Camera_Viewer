@@ -42,10 +42,28 @@ Thermal frame data pushed automatically when capturing.
 |-------|------|-------------|
 | Thermal Data | 9,920 bytes | 80 × 62 pixels, 16-bit unsigned (little-endian) |
 
-**Pixel Layout**:
-- Resolution: 80 (width) × 62 (height)
-- Format: `uint16_t` raw sensor values
+**Frame Layout** (80 × 64 pixels):
+
+| Rows | Indices | Content |
+|------|---------|---------|
+| 0 | 0-79 | Header metadata |
+| 1-62 | 80-5039 | Thermal image (80×62) |
+| 63 | 5040-5119 | Footer/unused |
+
+**Header Fields** (first row):
+
+| Index | Content |
+|-------|---------|
+| `[0]` | Frame number |
+| `[1]` | VDD (supply voltage in mV) |
+| `[2]` | Die temperature (mK) |
+| `[5]` | Max temperature in frame (mK) |
+| `[6]` | Min temperature in frame (mK) |
+
+**Pixel Format**:
+- Format: `uint16_t` raw sensor values (little-endian)
 - Order: Row-major (left-to-right, top-to-bottom)
+- Actual image: 80×62 pixels starting at index 160
 
 ---
 
@@ -153,7 +171,7 @@ Note: Quadrant registers return 4-byte values, others return 2-byte values.
 
 ## Quadrant Layout
 
-The thermal image is divided into 4 quadrants based on `Xsplit` and `Ysplit`:
+The quadrant analysis operates on the **image area only** (80×62 pixels), excluding the 2 header rows.
 
 ```
      0          Xsplit           80
@@ -170,7 +188,7 @@ Ysplit├────────────┼──────────�
   62 └────────────┴────────────────┘
 ```
 
-**Quadrant Definitions**:
+**Quadrant Definitions** (on 80×62 image):
 - **A**: x ∈ [0, Xsplit), y ∈ [0, Ysplit)
 - **B**: x ∈ [Xsplit, 80), y ∈ [0, Ysplit)
 - **C**: x ∈ [0, Xsplit), y ∈ [Ysplit, 62)
@@ -180,7 +198,7 @@ Ysplit├────────────┼──────────�
 - `*max`: Highest pixel value in the quadrant
 - `*center`: Pixel value at the geometric center of the quadrant
 
-**Center Pixel Coordinates**:
+**Center Pixel Coordinates** (relative to image, not frame):
 - Acenter: `(Xsplit/2, Ysplit/2)`
 - Bcenter: `(Xsplit + (80-Xsplit)/2, Ysplit/2)`
 - Ccenter: `(Xsplit/2, Ysplit + (62-Ysplit)/2)`
