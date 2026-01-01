@@ -40,17 +40,16 @@ Thermal frame data pushed automatically when capturing.
 
 | Field | Size | Description |
 |-------|------|-------------|
-| Thermal Data | 9,920 bytes | 80 × 62 pixels, 16-bit unsigned (little-endian) |
+| Thermal Data | 10,240 bytes | 80 × 64 pixels, 16-bit unsigned (little-endian) |
 
 **Frame Layout** (80 × 64 pixels):
 
 | Rows | Indices | Content |
 |------|---------|---------|
-| 0 | 0-79 | Header metadata |
-| 1-62 | 80-5039 | Thermal image (80×62) |
-| 63 | 5040-5119 | Footer/unused |
+| 0-1 | 0-159 | Header metadata (2 rows) |
+| 2-63 | 160-5119 | Thermal image (80×62) |
 
-**Header Fields** (first row):
+**Header Fields** (first 2 rows):
 
 | Index | Content |
 |-------|---------|
@@ -63,7 +62,7 @@ Thermal frame data pushed automatically when capturing.
 **Pixel Format**:
 - Format: `uint16_t` raw sensor values (little-endian)
 - Order: Row-major (left-to-right, top-to-bottom)
-- Actual image: 80×62 pixels starting at index 160
+- Actual image: 80×62 pixels starting at row 2 (index 160)
 
 ---
 
