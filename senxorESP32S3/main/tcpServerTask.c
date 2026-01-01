@@ -101,8 +101,8 @@ void tcpServerTask(void * pvParameters)
 		if(xQueueReceive(senxorFrameQueue, &senxorDataPtr, portMAX_DELAY) && isClientConnected)
 		{
 			xSemaphoreTake(tcpServerSemaphore, portMAX_DELAY);
-			printf("Sending thermal frame: %d bytes\n", 80 * 63 * sizeof(uint16_t));  // 10080 bytes
-			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 63 * sizeof(uint16_t));  // 1 header row + 62 image rows
+			printf("Sending thermal frame: %d bytes\n", 80 * 64 * sizeof(uint16_t));  // 10240 bytes
+			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 64 * sizeof(uint16_t));  // 1 header row + 62 image rows + 1 footer
 			xSemaphoreGive(tcpServerSemaphore);
 			isFirstRun = false;
 		}// End if
