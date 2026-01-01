@@ -7,10 +7,10 @@ const path = require("path");
 
 const FRAME_WIDTH = 80;
 const FRAME_HEIGHT = 62;
-const RAW_FRAME_SIZE = FRAME_WIDTH * FRAME_HEIGHT * 2; // 9920 bytes
-const STRIP_HEAD = 160;
-const STRIP_TAIL = 160;
-const TCP_FRAME_SIZE = RAW_FRAME_SIZE + STRIP_HEAD + STRIP_TAIL; // 10240
+const RAW_FRAME_SIZE = FRAME_WIDTH * FRAME_HEIGHT * 2; // 9920 bytes (actual image)
+const HEADER_ROWS = 1;
+const HEADER_SIZE = FRAME_WIDTH * HEADER_ROWS * 2; // 160 bytes (first row is header)
+const TCP_FRAME_SIZE = FRAME_WIDTH * 64 * 2; // 10240 bytes (80x64 total from ESP32)
 
 let receiveBuffer = Buffer.alloc(0);
 let client = null;
@@ -169,8 +169,8 @@ function processProtocolPacket(buffer) {
   const lengthStr = buffer.slice(4, 8).toString("ascii");
   const payloadLen = parseInt(lengthStr, 16);
 
-  if (isNaN(payloadLen) || payloadLen < 8 || payloadLen > 1000) {
-    // Invalid - not a real protocol packet
+  if (isNaN(payloadLen) || payloadLen < 8 || payloadLen > 15000) {
+    // Invalid - not a real protocol packet (GFRA frames are ~10248 bytes)
     return null;
   }
 
@@ -224,18 +224,10 @@ function processData() {
     }
   }
 
-  // Now process raw thermal frames
-  // Frames are TCP_FRAME_SIZE bytes
+  // Process raw thermal frames (ESP32 sends 80x64, first 2 rows are headers)
   while (receiveBuffer.length >= TCP_FRAME_SIZE) {
-    // Check if there's a protocol packet before the next frame boundary
-    const nextProtocol = findPacketStart(receiveBuffer, 0);
-    if (nextProtocol !== -1 && nextProtocol < TCP_FRAME_SIZE) {
-      // There's a protocol packet embedded - extract frame data before it
-      // This shouldn't normally happen, but handle it gracefully
-      break;
-    }
-
-    const frame = receiveBuffer.slice(STRIP_HEAD, STRIP_HEAD + RAW_FRAME_SIZE);
+    // Skip header rows, copy actual image data
+    const frame = Buffer.from(receiveBuffer.slice(HEADER_SIZE, HEADER_SIZE + RAW_FRAME_SIZE));
     receiveBuffer = receiveBuffer.slice(TCP_FRAME_SIZE);
     broadcastFrame(frame);
   }
@@ -258,15 +250,17 @@ function connectToESP32(retryDelay = 3000) {
     console.log(`Connected to ESP32 at ${ESP32_HOST}:${ESP32_PORT}`);
     receiveBuffer = Buffer.alloc(0); // reset buffer
 
-    // Read initial quadrant config after short delay
+    // Disable polling temporarily to test frame stability
+    // TODO: Re-enable once ESP32 receive task is stable
+    /*
     setTimeout(() => {
       readQuadrantRegisters();
     }, 500);
 
-    // Start periodic polling for quadrant values (every 500ms)
     quadrantPollInterval = setInterval(() => {
       readQuadrantRegisters();
     }, 500);
+    */
   });
 
   client.setTimeout(5000); // optional timeout

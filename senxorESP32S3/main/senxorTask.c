@@ -208,10 +208,13 @@ void quadrant_Calculate(const uint16_t* frameData)
 	// Reset max values
 	uint16_t Amax = 0, Bmax = 0, Cmax = 0, Dmax = 0;
 
+	// Skip first 2 header rows - image data starts at row 2 (index 160)
+	const uint16_t* imageData = frameData + (2 * SENXOR_FRAME_WIDTH);
+
 	// Scan all pixels and find max for each quadrant
 	for (uint8_t y = 0; y < SENXOR_FRAME_HEIGHT; y++) {
 		for (uint8_t x = 0; x < SENXOR_FRAME_WIDTH; x++) {
-			uint16_t pixel = frameData[y * SENXOR_FRAME_WIDTH + x];
+			uint16_t pixel = imageData[y * SENXOR_FRAME_WIDTH + x];
 
 			if (x < xsplit && y < ysplit) {
 				// Quadrant A (top-left)
@@ -249,15 +252,15 @@ void quadrant_Calculate(const uint16_t* frameData)
 	if (Dcx >= SENXOR_FRAME_WIDTH) Dcx = SENXOR_FRAME_WIDTH - 1;
 	if (Dcy >= SENXOR_FRAME_HEIGHT) Dcy = SENXOR_FRAME_HEIGHT - 1;
 
-	// Store results
+	// Store results (use imageData which is offset past headers)
 	mQuadrantData.Amax = Amax;
-	mQuadrantData.Acenter = frameData[Acy * SENXOR_FRAME_WIDTH + Acx];
+	mQuadrantData.Acenter = imageData[Acy * SENXOR_FRAME_WIDTH + Acx];
 	mQuadrantData.Bmax = Bmax;
-	mQuadrantData.Bcenter = frameData[Bcy * SENXOR_FRAME_WIDTH + Bcx];
+	mQuadrantData.Bcenter = imageData[Bcy * SENXOR_FRAME_WIDTH + Bcx];
 	mQuadrantData.Cmax = Cmax;
-	mQuadrantData.Ccenter = frameData[Ccy * SENXOR_FRAME_WIDTH + Ccx];
+	mQuadrantData.Ccenter = imageData[Ccy * SENXOR_FRAME_WIDTH + Ccx];
 	mQuadrantData.Dmax = Dmax;
-	mQuadrantData.Dcenter = frameData[Dcy * SENXOR_FRAME_WIDTH + Dcx];
+	mQuadrantData.Dcenter = imageData[Dcy * SENXOR_FRAME_WIDTH + Dcx];
 }
 
 /*

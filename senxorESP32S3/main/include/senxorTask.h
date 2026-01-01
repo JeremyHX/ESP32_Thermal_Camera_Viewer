@@ -20,7 +20,7 @@
 
 // Frame dimensions
 #define SENXOR_FRAME_WIDTH  80
-#define SENXOR_FRAME_HEIGHT 64
+#define SENXOR_FRAME_HEIGHT 62
 
 // Quadrant register addresses
 #define REG_XSPLIT    0xC0
@@ -39,7 +39,7 @@
 #define DEFAULT_YSPLIT 31
 
 typedef struct senxorFrame{
-	uint16_t mFrame[80*63];
+	uint16_t mFrame[80*64];  // Full frame: 2 header rows + 62 image rows
 }senxorFrame;
 
 // Quadrant analysis data structure

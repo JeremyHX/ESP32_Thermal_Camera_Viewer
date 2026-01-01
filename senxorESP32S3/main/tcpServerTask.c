@@ -82,14 +82,17 @@ void tcpServerTask(void * pvParameters)
 	//senxorFrame *mSenxorFrameObj;
 
 	ESP_LOGI(TCPTAG,TCP_INIT_INFO,xPortGetCoreID());
-	cmdParser_Init(&mCmdPhaserObj);			
+	cmdParser_Init(&mCmdPhaserObj);
 	tcpServer_InitThermalBuff();
 	tcpServerStart();																											//Start tcp server
-	tcpServerRestart(0);																										//Start listen to the port
+
+	// Create semaphore for socket access synchronization
+	tcpServerSemaphore = xSemaphoreCreateMutex();
+
+	// Create receive task - it owns the connection lifecycle (accept, restart)
 	ESP_LOGI(TCPTAG, "Creating tcpServerRecvTask...");
 	BaseType_t res = xTaskCreate(tcpServerRecvTask, "tcpRecvTask", 8192, NULL, 4, &tcpServerRecvTaskHandle);
 	ESP_LOGI(TCPTAG, "tcpRecvTask result: %s", res == pdPASS ? "Success" : "Fail");
-	tcpServerSemaphore = xSemaphoreCreateMutex();
 
 	uint16_t* senxorDataPtr = NULL;
 	
@@ -97,15 +100,9 @@ void tcpServerTask(void * pvParameters)
 	{
 		if(xQueueReceive(senxorFrameQueue, &senxorDataPtr, portMAX_DELAY) && isClientConnected)
 		{
-			//memcpy(mTxBuff+mMemcpyOffset, mSenxorFrameObj->mFrame, mMemcpySize*sizeof(uint16_t));		//Copy received object to buffer
-			//sprintf((char *)&mTxBuff[mTxPacketSize - 4], "%04X", getCRC(mTxBuff+4,mTxPacketSize-4));	
 			xSemaphoreTake(tcpServerSemaphore, portMAX_DELAY);
-			//tcpServerSend(mTxBuff,mTxPacketSize); 
-
-			printf("Sending thermal frame: %d bytes\n", 80 * 64 * sizeof(uint16_t));  // Will print 10240
-			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 64 * sizeof(uint16_t));  // Send 10240 bytes
-
-			//printf("mTxPacketSize: %d\n", mTxPacketSize);
+			printf("Sending thermal frame: %d bytes\n", 80 * 63 * sizeof(uint16_t));  // 10080 bytes
+			tcpServerSend((uint8_t*)senxorDataPtr, 80 * 63 * sizeof(uint16_t));  // 1 header row + 62 image rows
 			xSemaphoreGive(tcpServerSemaphore);
 			isFirstRun = false;
 		}// End if
@@ -125,22 +122,28 @@ void tcpServerRecvTask(void* pvParameters)
 {
 	ESP_LOGI(TCPTAG, ">>>> tcpServerRecvTask started");
 
+	// This task owns the connection lifecycle - do initial accept
+	tcpServerRestart(0);
+
 	for(;;)
 	{
+		// If not connected, wait for new connection
+		if (!isClientConnected)
+		{
+			ESP_LOGI(TCPTAG, "Waiting for client connection...");
+			tcpServerRestart(0);
+			continue;
+		}
 
-		ESP_LOGI(TCPTAG, "tcpServerRecvTask running...");
+		// Receive and process commands
 		if(tcpServerGet() < 0)
 		{
-			tcpServerRestart(0);			//If there is an error during command receiving phase. Restart the server.
+			ESP_LOGW(TCPTAG, "tcpServerGet failed, client disconnected");
+			isClientConnected = false;
+			Acces_Write_Reg(0xB1, 0x00);  // Stop streaming
 		}
-		else
-		{
-			isClientConnected = true;		//If no error, it is assumed that the client is connected and the data can be sent via TCP/UDP.
-			Acces_Write_Reg(0xB1, 0x03);
-			ESP_LOGI(TCPTAG, "Client connected, stream started");
-		}
-		vTaskDelay(pdMS_TO_TICKS(200));		//Give way every 100ms
-	}// 
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
 }//End tcpServerRecvTask
 
 /*
@@ -367,35 +370,26 @@ void tcpServerShutdown(void)
  **************************************************************************/
 int tcpServerSend(const uint8_t* data, const size_t t)
 {
+	// Don't attempt send if not connected
+	if (!isClientConnected)
+	{
+		return -1;
+	}
+
 #if CONFIG_MI_SER_MODE_TCP
-	const int err = write(connect_sock,data,t); 										//Send data via socket. Wait until all bytes are transferred.
+	const int err = write(connect_sock, data, t);
 #endif
 
 #if CONFIG_MI_SER_MODE_UDP
 	const int err = sendto(server_sock, data, t, 0, (struct sockaddr *)&source_addr, sizeof(source_addr));
 #endif
-	/*
-	 * If there is any error during the transmission.
-	 * The TCP server will restart alongside the serial processor
-	 */
+
 	if(err < 0)
 	{
-		ESP_LOGE(TCPTAG, TCP_ERR_TRANS, connect_sock,  errno, strerror(errno));
+		ESP_LOGE(TCPTAG, TCP_ERR_TRANS, connect_sock, errno, strerror(errno));
 		isClientConnected = false;
-
-		//If client is disconnected
-		switch(errno)
-		{
-			case 104:
-			case 128:
-				Acces_Write_Reg(0xB1,0x00);
-			break;
-			default:
-				Acces_Write_Reg(0xB1,0x00);
-			break;
-		}
-
-		tcpServerRestart(0);  // reset accept() loop
+		Acces_Write_Reg(0xB1, 0x00);  // Stop streaming
+		// Don't call tcpServerRestart here - recv task owns the connection lifecycle
 	}
 	return err;
 

@@ -42,10 +42,27 @@ Thermal frame data pushed automatically when capturing.
 |-------|------|-------------|
 | Thermal Data | 10,240 bytes | 80 × 64 pixels, 16-bit unsigned (little-endian) |
 
-**Pixel Layout**:
-- Resolution: 80 (width) × 64 (height)
-- Format: `uint16_t` raw sensor values
+**Frame Layout** (80 × 64 pixels):
+
+| Rows | Indices | Content |
+|------|---------|---------|
+| 0-1 | 0-159 | Header metadata |
+| 2-63 | 160-5119 | Thermal image (80×62) |
+
+**Header Fields** (first 2 rows):
+
+| Index | Content |
+|-------|---------|
+| `[0]` | Frame number |
+| `[1]` | VDD (supply voltage in mV) |
+| `[2]` | Die temperature (mK) |
+| `[5]` | Max temperature in frame (mK) |
+| `[6]` | Min temperature in frame (mK) |
+
+**Pixel Format**:
+- Format: `uint16_t` raw sensor values (little-endian)
 - Order: Row-major (left-to-right, top-to-bottom)
+- Actual image: 80×62 pixels starting at index 160
 
 ---
 
@@ -139,7 +156,7 @@ Note: Quadrant registers return 4-byte values, others return 2-byte values.
 | Address | Name | R/W | Default | Description |
 |---------|------|-----|---------|-------------|
 | `0xC0` | Xsplit | R/W | 40 | X split point (0-80), persisted to NVS |
-| `0xC1` | Ysplit | R/W | 31 | Y split point (0-64), persisted to NVS |
+| `0xC1` | Ysplit | R/W | 31 | Y split point (0-62), persisted to NVS |
 | `0xC2` | Amax | R | - | Maximum value in quadrant A (16-bit) |
 | `0xC3` | Acenter | R | - | Center pixel value in quadrant A (16-bit) |
 | `0xC4` | Bmax | R | - | Maximum value in quadrant B (16-bit) |
@@ -153,7 +170,7 @@ Note: Quadrant registers return 4-byte values, others return 2-byte values.
 
 ## Quadrant Layout
 
-The thermal image is divided into 4 quadrants based on `Xsplit` and `Ysplit`:
+The quadrant analysis operates on the **image area only** (80×62 pixels), excluding the 2 header rows.
 
 ```
      0          Xsplit           80
@@ -167,24 +184,24 @@ Ysplit├────────────┼──────────�
      │     C      │       D        │
      │(bottom-left)│(bottom-right) │
      │            │                │
-  64 └────────────┴────────────────┘
+  62 └────────────┴────────────────┘
 ```
 
-**Quadrant Definitions**:
+**Quadrant Definitions** (on 80×62 image):
 - **A**: x ∈ [0, Xsplit), y ∈ [0, Ysplit)
 - **B**: x ∈ [Xsplit, 80), y ∈ [0, Ysplit)
-- **C**: x ∈ [0, Xsplit), y ∈ [Ysplit, 64)
-- **D**: x ∈ [Xsplit, 80), y ∈ [Ysplit, 64)
+- **C**: x ∈ [0, Xsplit), y ∈ [Ysplit, 62)
+- **D**: x ∈ [Xsplit, 80), y ∈ [Ysplit, 62)
 
 **Register Values**:
 - `*max`: Highest pixel value in the quadrant
 - `*center`: Pixel value at the geometric center of the quadrant
 
-**Center Pixel Coordinates**:
+**Center Pixel Coordinates** (relative to image, not frame):
 - Acenter: `(Xsplit/2, Ysplit/2)`
 - Bcenter: `(Xsplit + (80-Xsplit)/2, Ysplit/2)`
-- Ccenter: `(Xsplit/2, Ysplit + (64-Ysplit)/2)`
-- Dcenter: `(Xsplit + (80-Xsplit)/2, Ysplit + (64-Ysplit)/2)`
+- Ccenter: `(Xsplit/2, Ysplit + (62-Ysplit)/2)`
+- Dcenter: `(Xsplit + (80-Xsplit)/2, Ysplit + (62-Ysplit)/2)`
 
 ---
 
