@@ -1,0 +1,457 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A100000000000001 /* ThermalViewerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000001 /* ThermalViewerApp.swift */; };
+		A100000000000002 /* ThermalProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000002 /* ThermalProtocol.swift */; };
+		A100000000000003 /* ThermalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000003 /* ThermalFrame.swift */; };
+		A100000000000004 /* QuadrantData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000004 /* QuadrantData.swift */; };
+		A100000000000005 /* FrameStreamConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000005 /* FrameStreamConnection.swift */; };
+		A100000000000006 /* CommandConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000006 /* CommandConnection.swift */; };
+		A100000000000007 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000007 /* ConnectionManager.swift */; };
+		A100000000000008 /* ColorPaletteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000008 /* ColorPaletteService.swift */; };
+		A100000000000009 /* ThermalCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000009 /* ThermalCanvasView.swift */; };
+		A10000000000000A /* QuadrantOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000A /* QuadrantOverlayView.swift */; };
+		A10000000000000B /* ThermalViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000B /* ThermalViewerView.swift */; };
+		A10000000000000C /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000C /* ConnectionView.swift */; };
+		A10000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000D /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A200000000000001 /* ThermalViewerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalViewerApp.swift; sourceTree = "<group>"; };
+		A200000000000002 /* ThermalProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalProtocol.swift; sourceTree = "<group>"; };
+		A200000000000003 /* ThermalFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalFrame.swift; sourceTree = "<group>"; };
+		A200000000000004 /* QuadrantData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuadrantData.swift; sourceTree = "<group>"; };
+		A200000000000005 /* FrameStreamConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameStreamConnection.swift; sourceTree = "<group>"; };
+		A200000000000006 /* CommandConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandConnection.swift; sourceTree = "<group>"; };
+		A200000000000007 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
+		A200000000000008 /* ColorPaletteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPaletteService.swift; sourceTree = "<group>"; };
+		A200000000000009 /* ThermalCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalCanvasView.swift; sourceTree = "<group>"; };
+		A20000000000000A /* QuadrantOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuadrantOverlayView.swift; sourceTree = "<group>"; };
+		A20000000000000B /* ThermalViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThermalViewerView.swift; sourceTree = "<group>"; };
+		A20000000000000C /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
+		A20000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000F /* ThermalViewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ThermalViewer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A300000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A400000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A400000000000002 /* ThermalViewer */,
+				A400000000000010 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A400000000000002 /* ThermalViewer */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000001 /* ThermalViewerApp.swift */,
+				A400000000000003 /* Core */,
+				A400000000000007 /* Features */,
+				A40000000000000B /* Services */,
+				A20000000000000D /* Assets.xcassets */,
+				A20000000000000E /* Info.plist */,
+			);
+			path = ThermalViewer;
+			sourceTree = "<group>";
+		};
+		A400000000000003 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A400000000000004 /* Protocol */,
+				A400000000000005 /* Models */,
+				A400000000000006 /* Networking */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A400000000000004 /* Protocol */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000002 /* ThermalProtocol.swift */,
+			);
+			path = Protocol;
+			sourceTree = "<group>";
+		};
+		A400000000000005 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000003 /* ThermalFrame.swift */,
+				A200000000000004 /* QuadrantData.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A400000000000006 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000005 /* FrameStreamConnection.swift */,
+				A200000000000006 /* CommandConnection.swift */,
+				A200000000000007 /* ConnectionManager.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		A400000000000007 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A400000000000008 /* Viewer */,
+				A40000000000000A /* Connection */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A400000000000008 /* Viewer */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000009 /* ThermalCanvasView.swift */,
+				A20000000000000A /* QuadrantOverlayView.swift */,
+				A20000000000000B /* ThermalViewerView.swift */,
+			);
+			path = Viewer;
+			sourceTree = "<group>";
+		};
+		A40000000000000A /* Connection */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000C /* ConnectionView.swift */,
+			);
+			path = Connection;
+			sourceTree = "<group>";
+		};
+		A40000000000000B /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000008 /* ColorPaletteService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A400000000000010 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000F /* ThermalViewer.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A500000000000001 /* ThermalViewer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A700000000000003 /* Build configuration list for PBXNativeTarget "ThermalViewer" */;
+			buildPhases = (
+				A600000000000001 /* Sources */,
+				A300000000000001 /* Frameworks */,
+				A600000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ThermalViewer;
+			productName = ThermalViewer;
+			productReference = A20000000000000F /* ThermalViewer.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A800000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					A500000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = A700000000000001 /* Build configuration list for PBXProject "ThermalViewer" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A400000000000001;
+			productRefGroup = A400000000000010 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A500000000000001 /* ThermalViewer */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A600000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000D /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A600000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000000000001 /* ThermalViewerApp.swift in Sources */,
+				A100000000000002 /* ThermalProtocol.swift in Sources */,
+				A100000000000003 /* ThermalFrame.swift in Sources */,
+				A100000000000004 /* QuadrantData.swift in Sources */,
+				A100000000000005 /* FrameStreamConnection.swift in Sources */,
+				A100000000000006 /* CommandConnection.swift in Sources */,
+				A100000000000007 /* ConnectionManager.swift in Sources */,
+				A100000000000008 /* ColorPaletteService.swift in Sources */,
+				A100000000000009 /* ThermalCanvasView.swift in Sources */,
+				A10000000000000A /* QuadrantOverlayView.swift in Sources */,
+				A10000000000000B /* ThermalViewerView.swift in Sources */,
+				A10000000000000C /* ConnectionView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A900000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 23H7BR7672;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A900000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 23H7BR7672;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A900000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ThermalViewer/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UIStatusBarHidden = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.thermohood.ThermalViewer;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		A900000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ThermalViewer/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UIStatusBarHidden = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.thermohood.ThermalViewer;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A700000000000001 /* Build configuration list for PBXProject "ThermalViewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A900000000000001 /* Debug */,
+				A900000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A700000000000003 /* Build configuration list for PBXNativeTarget "ThermalViewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A900000000000003 /* Debug */,
+				A900000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A800000000000001 /* Project object */;
+}
