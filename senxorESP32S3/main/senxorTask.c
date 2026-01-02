@@ -124,10 +124,9 @@ void senxorTask(void * pvParameters)
 			TickType_t pollPeriodMs = 1000 / pollFreq;
 			TickType_t frameStartTime = xTaskGetTickCount();
 
-			// Single-shot capture: start, read one frame, stop
-			Acces_Write_Reg(0xB1, 0x03);  // Start capture
-			DataFrameReceiveSenxor();      // Wait for and receive frame
-			Acces_Write_Reg(0xB1, 0x00);  // Stop capture immediately
+			// Single frame capture: B1_START_CAPTURE=1, B1_SINGLE_CONT=0
+			Acces_Write_Reg(0xB1, B1_START_CAPTURE);  // Trigger single frame
+			DataFrameReceiveSenxor();                  // Wait for and receive frame
 
 			const uint16_t* senxorData = DataFrameGetPointer();
 			if (senxorData != 0)
