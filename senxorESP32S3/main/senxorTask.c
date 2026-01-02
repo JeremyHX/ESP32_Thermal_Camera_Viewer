@@ -136,7 +136,7 @@ void senxorTask(void * pvParameters)
 			}
 
 			// Calculate delay based on poll frequency
-			TickType_t pollDelayMs = 1000 / pollFreq;
+			TickType_t pollDelayMs = 1;//1000 / pollFreq;
 			TickType_t currentTime = xTaskGetTickCount();
 
 			if ((currentTime - lastPollTime) >= pdMS_TO_TICKS(pollDelayMs))
@@ -242,8 +242,39 @@ void quadrant_Init(void)
 	mQuadrantData.Dmax = 0;
 	mQuadrantData.Dcenter = 0;
 
+	// Calculate default burner coordinates (center of each quadrant)
+	uint8_t defAx = DEFAULT_XSPLIT / 2;
+	uint8_t defAy = DEFAULT_YSPLIT / 2;
+	uint8_t defBx = DEFAULT_XSPLIT + (SENXOR_FRAME_WIDTH - DEFAULT_XSPLIT) / 2;
+	uint8_t defBy = DEFAULT_YSPLIT / 2;
+	uint8_t defCx = DEFAULT_XSPLIT / 2;
+	uint8_t defCy = DEFAULT_YSPLIT + (SENXOR_FRAME_HEIGHT - DEFAULT_YSPLIT) / 2;
+	uint8_t defDx = DEFAULT_XSPLIT + (SENXOR_FRAME_WIDTH - DEFAULT_XSPLIT) / 2;
+	uint8_t defDy = DEFAULT_YSPLIT + (SENXOR_FRAME_HEIGHT - DEFAULT_YSPLIT) / 2;
+
+	// Load burner coordinates from NVS, use defaults if not found
+	mQuadrantData.Aburnerx = NVS_ReadU8("aburnerx", defAx);
+	mQuadrantData.Aburnery = NVS_ReadU8("aburnery", defAy);
+	mQuadrantData.Bburnerx = NVS_ReadU8("bburnerx", defBx);
+	mQuadrantData.Bburnery = NVS_ReadU8("bburnery", defBy);
+	mQuadrantData.Cburnerx = NVS_ReadU8("cburnerx", defCx);
+	mQuadrantData.Cburnery = NVS_ReadU8("cburnery", defCy);
+	mQuadrantData.Dburnerx = NVS_ReadU8("dburnerx", defDx);
+	mQuadrantData.Dburnery = NVS_ReadU8("dburnery", defDy);
+
+	// Initialize burner temperature values to 0
+	mQuadrantData.Aburnert = 0;
+	mQuadrantData.Bburnert = 0;
+	mQuadrantData.Cburnert = 0;
+	mQuadrantData.Dburnert = 0;
+
 	ESP_LOGI(SXRTAG, "Quadrant analysis initialized: Xsplit=%d, Ysplit=%d",
 			 mQuadrantData.Xsplit, mQuadrantData.Ysplit);
+	ESP_LOGI(SXRTAG, "Burner coords: A(%d,%d) B(%d,%d) C(%d,%d) D(%d,%d)",
+			 mQuadrantData.Aburnerx, mQuadrantData.Aburnery,
+			 mQuadrantData.Bburnerx, mQuadrantData.Bburnery,
+			 mQuadrantData.Cburnerx, mQuadrantData.Cburnery,
+			 mQuadrantData.Dburnerx, mQuadrantData.Dburnery);
 }
 
 /*
@@ -318,42 +349,63 @@ void quadrant_Calculate(const uint16_t* frameData)
 	mQuadrantData.Ccenter = imageData[Ccy * SENXOR_FRAME_WIDTH + Ccx];
 	mQuadrantData.Dmax = Dmax;
 	mQuadrantData.Dcenter = imageData[Dcy * SENXOR_FRAME_WIDTH + Dcx];
+
+	// Read burner temperatures at stored coordinates
+	mQuadrantData.Aburnert = imageData[mQuadrantData.Aburnery * SENXOR_FRAME_WIDTH + mQuadrantData.Aburnerx];
+	mQuadrantData.Bburnert = imageData[mQuadrantData.Bburnery * SENXOR_FRAME_WIDTH + mQuadrantData.Bburnerx];
+	mQuadrantData.Cburnert = imageData[mQuadrantData.Cburnery * SENXOR_FRAME_WIDTH + mQuadrantData.Cburnerx];
+	mQuadrantData.Dburnert = imageData[mQuadrantData.Dburnery * SENXOR_FRAME_WIDTH + mQuadrantData.Dburnerx];
 }
 
 /*
  * ***********************************************************************
  * @brief       quadrant_ReadRegister
- * @param       regAddr - Register address (0xC0-0xC9)
- * @return      Register value (16-bit for max/center, 8-bit for split)
+ * @param       regAddr - Register address (0xC0-0xD5)
+ * @return      Register value (16-bit for max/center/burnert, 8-bit for split/burnerxy)
  * @details     Read quadrant register value
  **************************************************************************/
 uint16_t quadrant_ReadRegister(uint8_t regAddr)
 {
 	switch (regAddr) {
-		case REG_XSPLIT:  return mQuadrantData.Xsplit;
-		case REG_YSPLIT:  return mQuadrantData.Ysplit;
-		case REG_AMAX:    return mQuadrantData.Amax;
-		case REG_ACENTER: return mQuadrantData.Acenter;
-		case REG_BMAX:    return mQuadrantData.Bmax;
-		case REG_BCENTER: return mQuadrantData.Bcenter;
-		case REG_CMAX:    return mQuadrantData.Cmax;
-		case REG_CCENTER: return mQuadrantData.Ccenter;
-		case REG_DMAX:    return mQuadrantData.Dmax;
-		case REG_DCENTER: return mQuadrantData.Dcenter;
-		default:          return 0;
+		case REG_XSPLIT:   return mQuadrantData.Xsplit;
+		case REG_YSPLIT:   return mQuadrantData.Ysplit;
+		case REG_AMAX:     return mQuadrantData.Amax;
+		case REG_ACENTER:  return mQuadrantData.Acenter;
+		case REG_BMAX:     return mQuadrantData.Bmax;
+		case REG_BCENTER:  return mQuadrantData.Bcenter;
+		case REG_CMAX:     return mQuadrantData.Cmax;
+		case REG_CCENTER:  return mQuadrantData.Ccenter;
+		case REG_DMAX:     return mQuadrantData.Dmax;
+		case REG_DCENTER:  return mQuadrantData.Dcenter;
+		case REG_ABURNERX: return mQuadrantData.Aburnerx;
+		case REG_ABURNERY: return mQuadrantData.Aburnery;
+		case REG_ABURNERT: return mQuadrantData.Aburnert;
+		case REG_BBURNERX: return mQuadrantData.Bburnerx;
+		case REG_BBURNERY: return mQuadrantData.Bburnery;
+		case REG_BBURNERT: return mQuadrantData.Bburnert;
+		case REG_CBURNERX: return mQuadrantData.Cburnerx;
+		case REG_CBURNERY: return mQuadrantData.Cburnery;
+		case REG_CBURNERT: return mQuadrantData.Cburnert;
+		case REG_DBURNERX: return mQuadrantData.Dburnerx;
+		case REG_DBURNERY: return mQuadrantData.Dburnery;
+		case REG_DBURNERT: return mQuadrantData.Dburnert;
+		default:           return 0;
 	}
 }
 
 /*
  * ***********************************************************************
  * @brief       quadrant_WriteRegister
- * @param       regAddr - Register address (0xC0 or 0xC1 only)
+ * @param       regAddr - Register address (0xC0, 0xC1, or burner coords)
  * @param       value - Value to write
  * @return      None
- * @details     Write quadrant register (only Xsplit and Ysplit are writable)
+ * @details     Write quadrant register (split values and burner coordinates)
  **************************************************************************/
 void quadrant_WriteRegister(uint8_t regAddr, uint8_t value)
 {
+	uint8_t xsplit = mQuadrantData.Xsplit;
+	uint8_t ysplit = mQuadrantData.Ysplit;
+
 	switch (regAddr) {
 		case REG_XSPLIT:
 			if (value <= SENXOR_FRAME_WIDTH) {
@@ -368,6 +420,62 @@ void quadrant_WriteRegister(uint8_t regAddr, uint8_t value)
 				NVS_WriteU8("ysplit", value);
 				ESP_LOGI(SXRTAG, "Ysplit set to %d", value);
 			}
+			break;
+		// Quadrant A burner (top-left): x in [0, xsplit-1], y in [0, ysplit-1]
+		case REG_ABURNERX:
+			if (value >= xsplit) value = xsplit > 0 ? xsplit - 1 : 0;
+			mQuadrantData.Aburnerx = value;
+			NVS_WriteU8("aburnerx", value);
+			ESP_LOGI(SXRTAG, "Aburnerx set to %d", value);
+			break;
+		case REG_ABURNERY:
+			if (value >= ysplit) value = ysplit > 0 ? ysplit - 1 : 0;
+			mQuadrantData.Aburnery = value;
+			NVS_WriteU8("aburnery", value);
+			ESP_LOGI(SXRTAG, "Aburnery set to %d", value);
+			break;
+		// Quadrant B burner (top-right): x in [xsplit, 79], y in [0, ysplit-1]
+		case REG_BBURNERX:
+			if (value < xsplit) value = xsplit;
+			if (value >= SENXOR_FRAME_WIDTH) value = SENXOR_FRAME_WIDTH - 1;
+			mQuadrantData.Bburnerx = value;
+			NVS_WriteU8("bburnerx", value);
+			ESP_LOGI(SXRTAG, "Bburnerx set to %d", value);
+			break;
+		case REG_BBURNERY:
+			if (value >= ysplit) value = ysplit > 0 ? ysplit - 1 : 0;
+			mQuadrantData.Bburnery = value;
+			NVS_WriteU8("bburnery", value);
+			ESP_LOGI(SXRTAG, "Bburnery set to %d", value);
+			break;
+		// Quadrant C burner (bottom-left): x in [0, xsplit-1], y in [ysplit, 61]
+		case REG_CBURNERX:
+			if (value >= xsplit) value = xsplit > 0 ? xsplit - 1 : 0;
+			mQuadrantData.Cburnerx = value;
+			NVS_WriteU8("cburnerx", value);
+			ESP_LOGI(SXRTAG, "Cburnerx set to %d", value);
+			break;
+		case REG_CBURNERY:
+			if (value < ysplit) value = ysplit;
+			if (value >= SENXOR_FRAME_HEIGHT) value = SENXOR_FRAME_HEIGHT - 1;
+			mQuadrantData.Cburnery = value;
+			NVS_WriteU8("cburnery", value);
+			ESP_LOGI(SXRTAG, "Cburnery set to %d", value);
+			break;
+		// Quadrant D burner (bottom-right): x in [xsplit, 79], y in [ysplit, 61]
+		case REG_DBURNERX:
+			if (value < xsplit) value = xsplit;
+			if (value >= SENXOR_FRAME_WIDTH) value = SENXOR_FRAME_WIDTH - 1;
+			mQuadrantData.Dburnerx = value;
+			NVS_WriteU8("dburnerx", value);
+			ESP_LOGI(SXRTAG, "Dburnerx set to %d", value);
+			break;
+		case REG_DBURNERY:
+			if (value < ysplit) value = ysplit;
+			if (value >= SENXOR_FRAME_HEIGHT) value = SENXOR_FRAME_HEIGHT - 1;
+			mQuadrantData.Dburnery = value;
+			NVS_WriteU8("dburnery", value);
+			ESP_LOGI(SXRTAG, "Dburnery set to %d", value);
 			break;
 		default:
 			// Other registers are read-only

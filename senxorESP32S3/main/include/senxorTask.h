@@ -34,6 +34,20 @@
 #define REG_DMAX      0xC8
 #define REG_DCENTER   0xC9
 
+// Burner register addresses
+#define REG_ABURNERX  0xCA
+#define REG_ABURNERY  0xCB
+#define REG_ABURNERT  0xCC
+#define REG_BBURNERX  0xCD
+#define REG_BBURNERY  0xCE
+#define REG_BBURNERT  0xCF
+#define REG_CBURNERX  0xD0
+#define REG_CBURNERY  0xD1
+#define REG_CBURNERT  0xD2
+#define REG_DBURNERX  0xD3
+#define REG_DBURNERY  0xD4
+#define REG_DBURNERT  0xD5
+
 // Default split values
 #define DEFAULT_XSPLIT 40
 #define DEFAULT_YSPLIT 31
@@ -53,7 +67,20 @@ typedef struct quadrantData {
 	uint16_t Dmax;      // Max value in quadrant D (bottom-right)
 	uint16_t Dcenter;   // Center pixel value in quadrant D
 	uint8_t Xsplit;     // X split point (0-80)
-	uint8_t Ysplit;     // Y split point (0-64)
+	uint8_t Ysplit;     // Y split point (0-62)
+	// Burner coordinates (absolute image coordinates)
+	uint8_t Aburnerx;   // Burner X in quadrant A
+	uint8_t Aburnery;   // Burner Y in quadrant A
+	uint16_t Aburnert;  // Temperature at burner in quadrant A
+	uint8_t Bburnerx;   // Burner X in quadrant B
+	uint8_t Bburnery;   // Burner Y in quadrant B
+	uint16_t Bburnert;  // Temperature at burner in quadrant B
+	uint8_t Cburnerx;   // Burner X in quadrant C
+	uint8_t Cburnery;   // Burner Y in quadrant C
+	uint16_t Cburnert;  // Temperature at burner in quadrant C
+	uint8_t Dburnerx;   // Burner X in quadrant D
+	uint8_t Dburnery;   // Burner Y in quadrant D
+	uint16_t Dburnert;  // Temperature at burner in quadrant D
 } quadrantData_t;
 
 uint8_t senxorInit(void);

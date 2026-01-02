@@ -121,7 +121,7 @@ Read a value from a register.
    #000ARREG[VV][CRC]
 ```
 
-**Response** (quadrant 16-bit registers 0xC0-0xC9):
+**Response** (quadrant/burner 16-bit registers 0xC0-0xD5):
 ```
    #000CRREG[VVVV][CRC]
 ```
@@ -152,7 +152,7 @@ Read multiple registers in a single request.
    #[len]RRSE[AA1][VV1][AA2][VV2]...[CRC]
 ```
 
-Note: Quadrant registers return 4-byte values, others return 2-byte values.
+Note: Quadrant/burner registers (0xC0-0xD5) return 4-byte values, others return 2-byte values.
 
 ---
 
@@ -187,7 +187,7 @@ No response - command is rejected. Use streaming mode instead.
 - Only active when connected to port 3334 but NOT port 3333
 - When port 3333 is connected, frame streaming mode is used and POLL is ignored
 - Poll frequency resets to 0 on port 3334 disconnect
-- Quadrant registers (0xC2-0xC9) are updated silently at the specified rate
+- Quadrant and burner registers (0xC2-0xD5) are updated silently at the specified rate
 
 ---
 
@@ -216,6 +216,34 @@ No response - command is rejected. Use streaming mode instead.
 | `0xC7` | Ccenter | R | - | Center pixel value in quadrant C (16-bit) |
 | `0xC8` | Dmax | R | - | Maximum value in quadrant D (16-bit) |
 | `0xC9` | Dcenter | R | - | Center pixel value in quadrant D (16-bit) |
+
+### Burner Registers
+
+Each quadrant has a configurable "burner" point with X/Y coordinates and a temperature reading.
+
+| Address | Name | R/W | Default | Description |
+|---------|------|-----|---------|-------------|
+| `0xCA` | Aburnerx | R/W | 20 | Burner X coordinate in quadrant A, persisted to NVS |
+| `0xCB` | Aburnery | R/W | 15 | Burner Y coordinate in quadrant A, persisted to NVS |
+| `0xCC` | Aburnert | R | - | Temperature at burner point in quadrant A (16-bit) |
+| `0xCD` | Bburnerx | R/W | 60 | Burner X coordinate in quadrant B, persisted to NVS |
+| `0xCE` | Bburnery | R/W | 15 | Burner Y coordinate in quadrant B, persisted to NVS |
+| `0xCF` | Bburnert | R | - | Temperature at burner point in quadrant B (16-bit) |
+| `0xD0` | Cburnerx | R/W | 20 | Burner X coordinate in quadrant C, persisted to NVS |
+| `0xD1` | Cburnery | R/W | 46 | Burner Y coordinate in quadrant C, persisted to NVS |
+| `0xD2` | Cburnert | R | - | Temperature at burner point in quadrant C (16-bit) |
+| `0xD3` | Dburnerx | R/W | 60 | Burner X coordinate in quadrant D, persisted to NVS |
+| `0xD4` | Dburnery | R/W | 46 | Burner Y coordinate in quadrant D, persisted to NVS |
+| `0xD5` | Dburnert | R | - | Temperature at burner point in quadrant D (16-bit) |
+
+**Burner Coordinate Rules**:
+- Coordinates are absolute image coordinates (X: 0-79, Y: 0-61)
+- Coordinates are clamped to stay within the quadrant bounds:
+  - **A**: X ∈ [0, Xsplit-1], Y ∈ [0, Ysplit-1]
+  - **B**: X ∈ [Xsplit, 79], Y ∈ [0, Ysplit-1]
+  - **C**: X ∈ [0, Xsplit-1], Y ∈ [Ysplit, 61]
+  - **D**: X ∈ [Xsplit, 79], Y ∈ [Ysplit, 61]
+- Default values are the center of each quadrant (with Xsplit=40, Ysplit=31)
 
 ---
 
@@ -345,6 +373,6 @@ To skip CRC validation, use `XXXX` as the CRC value.
 ## Notes
 
 - All hex values are uppercase ASCII (e.g., `0A` not `0a`)
-- Quadrant values are calculated on every frame automatically
-- Xsplit and Ysplit persist across reboots (stored in NVS)
+- Quadrant and burner values are calculated on every frame automatically
+- Xsplit, Ysplit, and burner coordinates persist across reboots (stored in NVS)
 - The 16-bit register values are transmitted as 4 hex characters (big-endian ASCII representation)

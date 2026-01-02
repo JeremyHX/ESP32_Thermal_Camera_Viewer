@@ -23,6 +23,20 @@ extern int ApplicationReadVersion (int Address);
 #define REG_DMAX      0xC8
 #define REG_DCENTER   0xC9
 
+// Burner register addresses
+#define REG_ABURNERX  0xCA
+#define REG_ABURNERY  0xCB
+#define REG_ABURNERT  0xCC
+#define REG_BBURNERX  0xCD
+#define REG_BBURNERY  0xCE
+#define REG_BBURNERT  0xCF
+#define REG_CBURNERX  0xD0
+#define REG_CBURNERY  0xD1
+#define REG_CBURNERT  0xD2
+#define REG_DBURNERX  0xD3
+#define REG_DBURNERY  0xD4
+#define REG_DBURNERT  0xD5
+
 // External quadrant functions (implemented in senxorTask.c)
 extern uint16_t quadrant_ReadRegister(uint8_t regAddr);
 extern void quadrant_WriteRegister(uint8_t regAddr, uint8_t value);
@@ -31,9 +45,9 @@ extern void quadrant_WriteRegister(uint8_t regAddr, uint8_t value);
 extern bool tcpServerGetIsClientConnected(void);
 extern void cmdServerSetPollFreqHz(uint8_t freqHz);
 
-// Helper to check if address is a quadrant register
+// Helper to check if address is a quadrant/burner register (0xC0-0xD5)
 static inline bool isQuadrantRegister(int addr) {
-	return (addr >= REG_XSPLIT && addr <= REG_DCENTER);
+	return (addr >= REG_XSPLIT && addr <= REG_DBURNERT);
 }
 /******************************************************************************
  * @brief       getHexValue
