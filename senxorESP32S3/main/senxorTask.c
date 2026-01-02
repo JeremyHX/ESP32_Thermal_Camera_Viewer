@@ -88,6 +88,9 @@ void senxorTask(void * pvParameters)
 
 	senxorTask_Init();																																					//Initialise queue
 
+	TickType_t lastPollTime = 0;
+	bool pollCaptureStarted = false;  // Track if we started capture for polling mode
+
 	for(;;)
 	{
 		bool framePortConnected = tcpServerGetIsClientConnected();
@@ -97,6 +100,8 @@ void senxorTask(void * pvParameters)
 		// Mode 1: Frame streaming port (3333) connected - normal streaming behavior
 		if (framePortConnected)
 		{
+			// If we had started capture for polling, frame streaming will take over
+			pollCaptureStarted = false;
 
 			if ( (Acces_Read_Reg(0xB1) & B1_SINGLE_CONT) || (Acces_Read_Reg(0xB1) & B1_START_CAPTURE) )
 			{
@@ -120,30 +125,47 @@ void senxorTask(void * pvParameters)
 		// Mode 2: Only command port (3334) connected with polling enabled
 		else if (cmdPortConnected && pollFreq > 0)
 		{
-			// Calculate sleep time based on poll frequency
-			TickType_t pollPeriodMs = 1000 / pollFreq;
-			TickType_t frameStartTime = xTaskGetTickCount();
-
-			// Single frame capture: B1_START_CAPTURE=1, B1_SINGLE_CONT=0
-			Acces_Write_Reg(0xB1, B1_START_CAPTURE);  // Trigger single frame
-			DataFrameReceiveSenxor();                  // Wait for and receive frame
-
-			const uint16_t* senxorData = DataFrameGetPointer();
-			if (senxorData != 0)
+			// Start continuous capture if not already running
+			if (!pollCaptureStarted)
 			{
-				quadrant_Calculate(senxorData);  // Update quadrant registers
+				ESP_LOGI(SXRTAG, "Starting capture for polling mode at %d Hz", pollFreq);
+				Acces_Write_Reg(0xB1, 0x03);  // Start continuous capture
+				pollCaptureStarted = true;
+				lastPollTime = xTaskGetTickCount();  // Reset timer
+				vTaskDelay(pdMS_TO_TICKS(50));  // Give sensor time to start
 			}
-			DataFrameProcess();
 
-			// Sleep for remainder of poll period
-			TickType_t elapsed = xTaskGetTickCount() - frameStartTime;
-			TickType_t remainingMs = (pdMS_TO_TICKS(pollPeriodMs) > elapsed)
-				? (pdMS_TO_TICKS(pollPeriodMs) - elapsed) : 1;
-			vTaskDelay(remainingMs);
+			// Calculate delay based on poll frequency
+			TickType_t pollDelayMs = 1000 / pollFreq;
+			TickType_t currentTime = xTaskGetTickCount();
+
+			if ((currentTime - lastPollTime) >= pdMS_TO_TICKS(pollDelayMs))
+			{
+				lastPollTime = currentTime;
+
+				DataFrameReceiveSenxor();
+				const uint16_t* senxorData = DataFrameGetPointer();
+
+				if (senxorData != 0)
+				{
+					quadrant_Calculate(senxorData);  // Update quadrant registers only
+					ESP_LOGD(SXRTAG, "Poll update: Amax=%u Dmax=%u",
+							 quadrant_ReadRegister(0xC2), quadrant_ReadRegister(0xC8));
+				}
+				DataFrameProcess();
+			}
+			vTaskDelay(1);
 		}
 		// Mode 3: Neither port connected, or cmd port connected but pollFreq = 0
 		else
 		{
+			// Stop capture if we started it for polling
+			if (pollCaptureStarted)
+			{
+				ESP_LOGI(SXRTAG, "Stopping capture (polling inactive)");
+				Acces_Write_Reg(0xB1, 0x00);  // Stop capture
+				pollCaptureStarted = false;
+			}
 			vTaskDelay(pdMS_TO_TICKS(100));  // Sleep longer when idle
 		}
 	}//End for
