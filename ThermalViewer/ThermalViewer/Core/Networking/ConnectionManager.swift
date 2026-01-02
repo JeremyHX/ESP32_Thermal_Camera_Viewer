@@ -63,6 +63,10 @@ class ConnectionManager {
         // Start quadrant polling after a short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.startQuadrantPolling()
+            // If connecting without frame stream (Simple mode), send POLL to enable ESP32 polling
+            if !withFrameStream {
+                self?.commandConnection.sendPoll(frequency: 1)
+            }
         }
     }
 
