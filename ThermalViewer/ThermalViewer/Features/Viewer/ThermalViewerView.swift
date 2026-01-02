@@ -5,7 +5,6 @@ struct ThermalViewerView: View {
     @State private var selectedPalette: ColorPalette = .default
     @State private var temperatureUnit: TemperatureUnit = .celsius
     @State private var showQuadrants: Bool = true
-    @State private var isFlipped: Bool = false
     @State private var showSettings: Bool = false
 
     var body: some View {
@@ -32,14 +31,16 @@ struct ThermalViewerView: View {
                 ThermalCanvasView(
                     frame: connectionManager.currentFrame,
                     palette: selectedPalette,
-                    isFlipped: isFlipped
+                    flipHorizontally: connectionManager.flipHorizontally,
+                    flipVertically: connectionManager.flipVertically
                 )
 
                 // Quadrant overlay
                 QuadrantOverlayView(
                     quadrantData: connectionManager.quadrantData,
                     showQuadrants: showQuadrants,
-                    isFlipped: isFlipped,
+                    flipHorizontally: connectionManager.flipHorizontally,
+                    flipVertically: connectionManager.flipVertically,
                     temperatureUnit: temperatureUnit,
                     onXSplitChanged: connectionManager.setXSplit,
                     onYSplitChanged: connectionManager.setYSplit
@@ -169,8 +170,10 @@ struct ThermalViewerView: View {
             }
 
             // Toggles
+            @Bindable var cm = connectionManager
             Toggle("Show Quadrants", isOn: $showQuadrants)
-            Toggle("Flip Image", isOn: $isFlipped)
+            Toggle("Flip Horizontally", isOn: $cm.flipHorizontally)
+            Toggle("Flip Vertically", isOn: $cm.flipVertically)
 
             // Reset quadrants button
             Button("Reset Quadrants") {

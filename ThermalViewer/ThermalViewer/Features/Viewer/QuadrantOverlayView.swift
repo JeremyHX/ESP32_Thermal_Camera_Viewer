@@ -3,7 +3,8 @@ import SwiftUI
 struct QuadrantOverlayView: View {
     let quadrantData: QuadrantData
     let showQuadrants: Bool
-    let isFlipped: Bool
+    let flipHorizontally: Bool
+    let flipVertically: Bool
     let temperatureUnit: TemperatureUnit
     let onXSplitChanged: (Int) -> Void
     let onYSplitChanged: (Int) -> Void
@@ -170,42 +171,76 @@ struct QuadrantOverlayView: View {
         let xSplit = xPosition(in: geometry)
         let ySplit = yPosition(in: geometry)
 
-        // Determine label positions based on flip state
-        let leftLabel = isFlipped ? "B" : "A"
-        let rightLabel = isFlipped ? "A" : "B"
-        let bottomLeftLabel = isFlipped ? "D" : "C"
-        let bottomRightLabel = isFlipped ? "C" : "D"
+        // Determine which quadrant data appears in each screen position based on flip states
+        // Original layout: A=top-left, B=top-right, C=bottom-left, D=bottom-right
+        // Horizontal flip: swap left↔right (A↔B, C↔D)
+        // Vertical flip: swap top↔bottom (A↔C, B↔D)
+        let topLeftQuadrant: (label: String, max: UInt16, center: UInt16) = {
+            switch (flipHorizontally, flipVertically) {
+            case (false, false): return ("A", quadrantData.aMax, quadrantData.aCenter)
+            case (true, false):  return ("B", quadrantData.bMax, quadrantData.bCenter)
+            case (false, true):  return ("C", quadrantData.cMax, quadrantData.cCenter)
+            case (true, true):   return ("D", quadrantData.dMax, quadrantData.dCenter)
+            }
+        }()
+
+        let topRightQuadrant: (label: String, max: UInt16, center: UInt16) = {
+            switch (flipHorizontally, flipVertically) {
+            case (false, false): return ("B", quadrantData.bMax, quadrantData.bCenter)
+            case (true, false):  return ("A", quadrantData.aMax, quadrantData.aCenter)
+            case (false, true):  return ("D", quadrantData.dMax, quadrantData.dCenter)
+            case (true, true):   return ("C", quadrantData.cMax, quadrantData.cCenter)
+            }
+        }()
+
+        let bottomLeftQuadrant: (label: String, max: UInt16, center: UInt16) = {
+            switch (flipHorizontally, flipVertically) {
+            case (false, false): return ("C", quadrantData.cMax, quadrantData.cCenter)
+            case (true, false):  return ("D", quadrantData.dMax, quadrantData.dCenter)
+            case (false, true):  return ("A", quadrantData.aMax, quadrantData.aCenter)
+            case (true, true):   return ("B", quadrantData.bMax, quadrantData.bCenter)
+            }
+        }()
+
+        let bottomRightQuadrant: (label: String, max: UInt16, center: UInt16) = {
+            switch (flipHorizontally, flipVertically) {
+            case (false, false): return ("D", quadrantData.dMax, quadrantData.dCenter)
+            case (true, false):  return ("C", quadrantData.cMax, quadrantData.cCenter)
+            case (false, true):  return ("B", quadrantData.bMax, quadrantData.bCenter)
+            case (true, true):   return ("A", quadrantData.aMax, quadrantData.aCenter)
+            }
+        }()
 
         return Group {
             // Top-left quadrant
             quadrantLabel(
-                label: leftLabel,
-                maxTemp: isFlipped ? quadrantData.bMax : quadrantData.aMax,
-                centerTemp: isFlipped ? quadrantData.bCenter : quadrantData.aCenter
+                label: topLeftQuadrant.label,
+                maxTemp: topLeftQuadrant.max,
+                centerTemp: topLeftQuadrant.center
             )
             .position(x: xSplit / 2, y: ySplit / 2)
 
             // Top-right quadrant
             quadrantLabel(
-                label: rightLabel,
-                maxTemp: isFlipped ? quadrantData.aMax : quadrantData.bMax,
-                centerTemp: isFlipped ? quadrantData.aCenter : quadrantData.bCenter
+                label: topRightQuadrant.label,
+                maxTemp: topRightQuadrant.max,
+                centerTemp: topRightQuadrant.center
             )
             .position(x: xSplit + (geometry.size.width - xSplit) / 2, y: ySplit / 2)
 
             // Bottom-left quadrant
             quadrantLabel(
-                label: bottomLeftLabel,
-                maxTemp: isFlipped ? quadrantData.dMax : quadrantData.cMax,
-                centerTemp: isFlipped ? quadrantData.dCenter : quadrantData.cCenter
+                label: bottomLeftQuadrant.label,
+                maxTemp: bottomLeftQuadrant.max,
+                centerTemp: bottomLeftQuadrant.center
             )
             .position(x: xSplit / 2, y: ySplit + (geometry.size.height - ySplit) / 2)
 
             // Bottom-right quadrant
             quadrantLabel(
-                label: bottomRightLabel,
-                maxTemp: isFlipped ? quadrantData.cMax : quadrantData.dMax,
-                centerTemp: isFlipped ? quadrantData.cCenter : quadrantData.dCenter
+                label: bottomRightQuadrant.label,
+                maxTemp: bottomRightQuadrant.max,
+                centerTemp: bottomRightQuadrant.center
             )
             .position(x: xSplit + (geometry.size.width - xSplit) / 2, y: ySplit + (geometry.size.height - ySplit) / 2)
         }
@@ -234,19 +269,20 @@ struct QuadrantOverlayView: View {
 
     private func xPosition(in geometry: GeometryProxy) -> CGFloat {
         let pixelWidth = geometry.size.width / CGFloat(ThermalProtocol.frameWidth)
-        let xSplit = isFlipped ? (ThermalProtocol.frameWidth - displayXSplit) : displayXSplit
+        let xSplit = flipHorizontally ? (ThermalProtocol.frameWidth - displayXSplit) : displayXSplit
         return CGFloat(xSplit) * pixelWidth
     }
 
     private func yPosition(in geometry: GeometryProxy) -> CGFloat {
         let pixelHeight = geometry.size.height / CGFloat(ThermalProtocol.imageHeight)
-        return CGFloat(displayYSplit) * pixelHeight
+        let ySplit = flipVertically ? (ThermalProtocol.imageHeight - displayYSplit) : displayYSplit
+        return CGFloat(ySplit) * pixelHeight
     }
 
     private func pixelX(from screenX: CGFloat, in geometry: GeometryProxy) -> Int {
         let pixelWidth = geometry.size.width / CGFloat(ThermalProtocol.frameWidth)
         var pixel = Int(screenX / pixelWidth)
-        if isFlipped {
+        if flipHorizontally {
             pixel = ThermalProtocol.frameWidth - pixel
         }
         return max(1, min(79, pixel))
@@ -254,7 +290,10 @@ struct QuadrantOverlayView: View {
 
     private func pixelY(from screenY: CGFloat, in geometry: GeometryProxy) -> Int {
         let pixelHeight = geometry.size.height / CGFloat(ThermalProtocol.imageHeight)
-        let pixel = Int(screenY / pixelHeight)
+        var pixel = Int(screenY / pixelHeight)
+        if flipVertically {
+            pixel = ThermalProtocol.imageHeight - pixel
+        }
         return max(1, min(61, pixel))
     }
 }

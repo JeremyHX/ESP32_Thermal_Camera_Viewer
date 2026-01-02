@@ -13,6 +13,10 @@ class ConnectionManager {
     var fps: Int = 0
     var frameStreamEnabled: Bool = false
 
+    // Display settings (shared across tabs)
+    var flipHorizontally: Bool = false
+    var flipVertically: Bool = false
+
     private var fpsTimer: Timer?
     private var frameTimestamps: [Date] = []
     private var quadrantPollTimer: Timer?

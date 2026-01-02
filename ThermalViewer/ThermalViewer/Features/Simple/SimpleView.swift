@@ -41,34 +41,74 @@ struct SimpleView: View {
 
     private var gaugeGrid: some View {
         let quadrantData = connectionManager.quadrantData
+        let flipH = connectionManager.flipHorizontally
+        let flipV = connectionManager.flipVertically
+
+        // Determine which quadrant appears in each position based on flip settings
+        // Original layout: A=top-left, B=top-right, C=bottom-left, D=bottom-right
+        let topLeft: (label: String, temp: Double) = {
+            switch (flipH, flipV) {
+            case (false, false): return ("A", toCelsius(quadrantData.aMax))
+            case (true, false):  return ("B", toCelsius(quadrantData.bMax))
+            case (false, true):  return ("C", toCelsius(quadrantData.cMax))
+            case (true, true):   return ("D", toCelsius(quadrantData.dMax))
+            }
+        }()
+
+        let topRight: (label: String, temp: Double) = {
+            switch (flipH, flipV) {
+            case (false, false): return ("B", toCelsius(quadrantData.bMax))
+            case (true, false):  return ("A", toCelsius(quadrantData.aMax))
+            case (false, true):  return ("D", toCelsius(quadrantData.dMax))
+            case (true, true):   return ("C", toCelsius(quadrantData.cMax))
+            }
+        }()
+
+        let bottomLeft: (label: String, temp: Double) = {
+            switch (flipH, flipV) {
+            case (false, false): return ("C", toCelsius(quadrantData.cMax))
+            case (true, false):  return ("D", toCelsius(quadrantData.dMax))
+            case (false, true):  return ("A", toCelsius(quadrantData.aMax))
+            case (true, true):   return ("B", toCelsius(quadrantData.bMax))
+            }
+        }()
+
+        let bottomRight: (label: String, temp: Double) = {
+            switch (flipH, flipV) {
+            case (false, false): return ("D", toCelsius(quadrantData.dMax))
+            case (true, false):  return ("C", toCelsius(quadrantData.cMax))
+            case (false, true):  return ("B", toCelsius(quadrantData.bMax))
+            case (true, true):   return ("A", toCelsius(quadrantData.aMax))
+            }
+        }()
 
         return VStack(spacing: 200) {
-            // Top row: A and B
+            // Top row
             HStack(spacing: 20) {
                 LinearGaugeView(
-                    label: "A",
-                    temperature: toCelsius(quadrantData.aMax),
+                    label: topLeft.label,
+                    temperature: topLeft.temp,
                     temperatureUnit: temperatureUnit
                 )
 
                 LinearGaugeView(
-                    label: "B",
-                    temperature: toCelsius(quadrantData.bMax),
+                    label: topRight.label,
+                    temperature: topRight.temp,
                     temperatureUnit: temperatureUnit
                 )
             }
 
-            // Bottom row: C and D
+            // Bottom row
             HStack(spacing: 20) {
                 LinearGaugeView(
-                    label: "C",
-                    temperature: toCelsius(quadrantData.cMax),
+                    label: bottomLeft.label,
+                    temperature: bottomLeft.temp,
                     temperatureUnit: temperatureUnit
                 )
 
                 LinearGaugeView(
-                    label: "D",
-                    temperature: toCelsius(quadrantData.dMax),
+                    label: bottomRight.label,
+                    temperature: bottomRight.temp,
                     temperatureUnit: temperatureUnit
                 )
             }

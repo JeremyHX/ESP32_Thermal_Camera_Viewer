@@ -4,7 +4,8 @@ import CoreGraphics
 struct ThermalCanvasView: View {
     let frame: ThermalFrame?
     let palette: ColorPalette
-    let isFlipped: Bool
+    let flipHorizontally: Bool
+    let flipVertically: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -13,7 +14,7 @@ struct ThermalCanvasView: View {
                     .interpolation(.none)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .scaleEffect(x: isFlipped ? -1 : 1, y: 1)
+                    .scaleEffect(x: flipHorizontally ? -1 : 1, y: flipVertically ? -1 : 1)
                     .frame(width: geometry.size.width, height: geometry.size.height)
             } else {
                 Rectangle()
