@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConnectionView: View {
     @Environment(ConnectionManager.self) private var connectionManager
+    @Binding var initialTab: AppTab
     @State private var ipAddress: String = "192.168.4.213"
     @State private var isConnecting: Bool = false
 
@@ -39,6 +40,19 @@ struct ConnectionView: View {
                         .textInputAutocapitalization(.never)
                 }
 
+                // Mode selector
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Start In")
+                        .font(.headline)
+
+                    Picker("Mode", selection: $initialTab) {
+                        Text("Simple (Gauges)").tag(AppTab.simple)
+                        Text("Advanced (Thermal)").tag(AppTab.advanced)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 300)
+                }
+
                 Button {
                     connect()
                 } label: {
@@ -64,7 +78,7 @@ struct ConnectionView: View {
             Spacer()
 
             // Info footer
-            Text("Ports: 3333 (frames), 3334 (commands)")
+            Text(initialTab == .simple ? "Port: 3334 (commands only)" : "Ports: 3333 (frames), 3334 (commands)")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -76,7 +90,7 @@ struct ConnectionView: View {
                 isConnecting = false
             }
         }
-        .onChange(of: connectionManager.frameConnection.state) { _, state in
+        .onChange(of: connectionManager.commandConnection.state) { _, state in
             if case .failed = state {
                 isConnecting = false
             }
@@ -91,7 +105,7 @@ struct ConnectionView: View {
                     Text("Connecting to \(ipAddress)...")
                 }
                 .foregroundColor(.secondary)
-            } else if case .failed(let error) = connectionManager.frameConnection.state {
+            } else if case .failed(let error) = connectionManager.commandConnection.state {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundColor(.red)
@@ -105,7 +119,9 @@ struct ConnectionView: View {
 
     private func connect() {
         isConnecting = true
-        connectionManager.connect(to: ipAddress)
+        // Connect with frame stream only if starting in Advanced mode
+        let withFrameStream = (initialTab == .advanced)
+        connectionManager.connect(to: ipAddress, withFrameStream: withFrameStream)
 
         // Timeout after 10 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) {

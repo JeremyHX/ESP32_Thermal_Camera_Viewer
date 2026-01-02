@@ -20,6 +20,8 @@
 		A10000000000000B /* ThermalViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000B /* ThermalViewerView.swift */; };
 		A10000000000000C /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000C /* ConnectionView.swift */; };
 		A10000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000D /* Assets.xcassets */; };
+		A100000000000010 /* SimpleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000010 /* SimpleView.swift */; };
+		A100000000000011 /* LinearGaugeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000011 /* LinearGaugeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +40,8 @@
 		A20000000000000D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000F /* ThermalViewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ThermalViewer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A200000000000010 /* SimpleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleView.swift; sourceTree = "<group>"; };
+		A200000000000011 /* LinearGaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinearGaugeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,8 +118,18 @@
 			children = (
 				A400000000000008 /* Viewer */,
 				A40000000000000A /* Connection */,
+				A400000000000012 /* Simple */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		A400000000000012 /* Simple */ = {
+			isa = PBXGroup;
+			children = (
+				A200000000000010 /* SimpleView.swift */,
+				A200000000000011 /* LinearGaugeView.swift */,
+			);
+			path = Simple;
 			sourceTree = "<group>";
 		};
 		A400000000000008 /* Viewer */ = {
@@ -233,6 +247,8 @@
 				A10000000000000A /* QuadrantOverlayView.swift in Sources */,
 				A10000000000000B /* ThermalViewerView.swift in Sources */,
 				A10000000000000C /* ConnectionView.swift in Sources */,
+				A100000000000010 /* SimpleView.swift in Sources */,
+				A100000000000011 /* LinearGaugeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

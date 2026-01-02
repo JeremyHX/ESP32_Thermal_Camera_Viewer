@@ -11,6 +11,7 @@ class ConnectionManager {
     var currentFrame: ThermalFrame?
     var frameCount: Int = 0
     var fps: Int = 0
+    var frameStreamEnabled: Bool = false
 
     private var fpsTimer: Timer?
     private var frameTimestamps: [Date] = []
@@ -18,13 +19,20 @@ class ConnectionManager {
     private var reconnectTask: Task<Void, Never>?
 
     var isConnected: Bool {
-        frameConnection.state == .ready && commandConnection.state == .ready
+        if frameStreamEnabled {
+            return frameConnection.state == .ready && commandConnection.state == .ready
+        } else {
+            return commandConnection.state == .ready
+        }
     }
 
     var isConnecting: Bool {
-        let frameConnecting = [.preparing, .setup].contains(where: { frameConnection.state == $0 })
         let cmdConnecting = [.preparing, .setup].contains(where: { commandConnection.state == $0 })
-        return frameConnecting || cmdConnecting
+        if frameStreamEnabled {
+            let frameConnecting = [.preparing, .setup].contains(where: { frameConnection.state == $0 })
+            return frameConnecting || cmdConnecting
+        }
+        return cmdConnecting
     }
 
     init() {
@@ -41,11 +49,15 @@ class ConnectionManager {
         }
     }
 
-    func connect(to host: String) {
+    /// Connect with frame streaming enabled (for Advanced view)
+    func connect(to host: String, withFrameStream: Bool = true) {
         self.host = host
+        self.frameStreamEnabled = withFrameStream
         reconnectTask?.cancel()
 
-        frameConnection.connect(host: host)
+        if withFrameStream {
+            frameConnection.connect(host: host)
+        }
         commandConnection.connect(host: host)
 
         // Start quadrant polling after a short delay
@@ -62,6 +74,22 @@ class ConnectionManager {
         frameCount = 0
         fps = 0
         currentFrame = nil
+        frameStreamEnabled = false
+    }
+
+    /// Enable or disable frame streaming while connected
+    func setFrameStreamEnabled(_ enabled: Bool) {
+        guard !host.isEmpty else { return }
+
+        if enabled && !frameStreamEnabled {
+            frameConnection.connect(host: host)
+        } else if !enabled && frameStreamEnabled {
+            frameConnection.disconnect()
+            currentFrame = nil
+            frameCount = 0
+            fps = 0
+        }
+        frameStreamEnabled = enabled
     }
 
     // MARK: - Frame Handling
