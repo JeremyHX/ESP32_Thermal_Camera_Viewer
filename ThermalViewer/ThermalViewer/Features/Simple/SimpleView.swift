@@ -3,11 +3,24 @@ import SwiftUI
 struct SimpleView: View {
     @Environment(ConnectionManager.self) private var connectionManager
     @State private var temperatureUnit: TemperatureUnit = .celsius
+    @State private var useMaxTemperature: Bool = true
     @State private var alertTracker = TemperatureAlertTracker()
 
     // Convert raw sensor values to Celsius
     private func toCelsius(_ raw: UInt16) -> Double {
         return Double(raw) * 0.0984 - 265.82
+    }
+
+    // Get temperature for a quadrant based on useMaxTemperature setting
+    private func temperatureForQuadrant(_ quadrant: String) -> Double {
+        let data = connectionManager.quadrantData
+        switch quadrant {
+        case "A": return toCelsius(useMaxTemperature ? data.aMax : data.aCenter)
+        case "B": return toCelsius(useMaxTemperature ? data.bMax : data.bCenter)
+        case "C": return toCelsius(useMaxTemperature ? data.cMax : data.cCenter)
+        case "D": return toCelsius(useMaxTemperature ? data.dMax : data.dCenter)
+        default: return 0
+        }
     }
 
     var body: some View {
@@ -22,17 +35,30 @@ struct SimpleView: View {
                 .background(Color(.systemBackground).opacity(0.95))
         }
         .background(Color.black)
-        .onChange(of: connectionManager.quadrantData.aMax) { _, newValue in
-            alertTracker.checkTemperature(quadrant: "A", temperature: toCelsius(newValue))
+        // Monitor both max and center values for alerts
+        .onChange(of: connectionManager.quadrantData.aMax) { _, _ in
+            alertTracker.checkTemperature(quadrant: "A", temperature: temperatureForQuadrant("A"))
         }
-        .onChange(of: connectionManager.quadrantData.bMax) { _, newValue in
-            alertTracker.checkTemperature(quadrant: "B", temperature: toCelsius(newValue))
+        .onChange(of: connectionManager.quadrantData.aCenter) { _, _ in
+            alertTracker.checkTemperature(quadrant: "A", temperature: temperatureForQuadrant("A"))
         }
-        .onChange(of: connectionManager.quadrantData.cMax) { _, newValue in
-            alertTracker.checkTemperature(quadrant: "C", temperature: toCelsius(newValue))
+        .onChange(of: connectionManager.quadrantData.bMax) { _, _ in
+            alertTracker.checkTemperature(quadrant: "B", temperature: temperatureForQuadrant("B"))
         }
-        .onChange(of: connectionManager.quadrantData.dMax) { _, newValue in
-            alertTracker.checkTemperature(quadrant: "D", temperature: toCelsius(newValue))
+        .onChange(of: connectionManager.quadrantData.bCenter) { _, _ in
+            alertTracker.checkTemperature(quadrant: "B", temperature: temperatureForQuadrant("B"))
+        }
+        .onChange(of: connectionManager.quadrantData.cMax) { _, _ in
+            alertTracker.checkTemperature(quadrant: "C", temperature: temperatureForQuadrant("C"))
+        }
+        .onChange(of: connectionManager.quadrantData.cCenter) { _, _ in
+            alertTracker.checkTemperature(quadrant: "C", temperature: temperatureForQuadrant("C"))
+        }
+        .onChange(of: connectionManager.quadrantData.dMax) { _, _ in
+            alertTracker.checkTemperature(quadrant: "D", temperature: temperatureForQuadrant("D"))
+        }
+        .onChange(of: connectionManager.quadrantData.dCenter) { _, _ in
+            alertTracker.checkTemperature(quadrant: "D", temperature: temperatureForQuadrant("D"))
         }
         .onDisappear {
             alertTracker.reset()
@@ -40,45 +66,44 @@ struct SimpleView: View {
     }
 
     private var gaugeGrid: some View {
-        let quadrantData = connectionManager.quadrantData
         let flipH = connectionManager.flipHorizontally
         let flipV = connectionManager.flipVertically
 
         // Determine which quadrant appears in each position based on flip settings
         // Original layout: A=top-left, B=top-right, C=bottom-left, D=bottom-right
-        let topLeft: (label: String, temp: Double) = {
+        let topLeftLabel: String = {
             switch (flipH, flipV) {
-            case (false, false): return ("A", toCelsius(quadrantData.aMax))
-            case (true, false):  return ("B", toCelsius(quadrantData.bMax))
-            case (false, true):  return ("C", toCelsius(quadrantData.cMax))
-            case (true, true):   return ("D", toCelsius(quadrantData.dMax))
+            case (false, false): return "A"
+            case (true, false):  return "B"
+            case (false, true):  return "C"
+            case (true, true):   return "D"
             }
         }()
 
-        let topRight: (label: String, temp: Double) = {
+        let topRightLabel: String = {
             switch (flipH, flipV) {
-            case (false, false): return ("B", toCelsius(quadrantData.bMax))
-            case (true, false):  return ("A", toCelsius(quadrantData.aMax))
-            case (false, true):  return ("D", toCelsius(quadrantData.dMax))
-            case (true, true):   return ("C", toCelsius(quadrantData.cMax))
+            case (false, false): return "B"
+            case (true, false):  return "A"
+            case (false, true):  return "D"
+            case (true, true):   return "C"
             }
         }()
 
-        let bottomLeft: (label: String, temp: Double) = {
+        let bottomLeftLabel: String = {
             switch (flipH, flipV) {
-            case (false, false): return ("C", toCelsius(quadrantData.cMax))
-            case (true, false):  return ("D", toCelsius(quadrantData.dMax))
-            case (false, true):  return ("A", toCelsius(quadrantData.aMax))
-            case (true, true):   return ("B", toCelsius(quadrantData.bMax))
+            case (false, false): return "C"
+            case (true, false):  return "D"
+            case (false, true):  return "A"
+            case (true, true):   return "B"
             }
         }()
 
-        let bottomRight: (label: String, temp: Double) = {
+        let bottomRightLabel: String = {
             switch (flipH, flipV) {
-            case (false, false): return ("D", toCelsius(quadrantData.dMax))
-            case (true, false):  return ("C", toCelsius(quadrantData.cMax))
-            case (false, true):  return ("B", toCelsius(quadrantData.bMax))
-            case (true, true):   return ("A", toCelsius(quadrantData.aMax))
+            case (false, false): return "D"
+            case (true, false):  return "C"
+            case (false, true):  return "B"
+            case (true, true):   return "A"
             }
         }()
 
@@ -86,14 +111,14 @@ struct SimpleView: View {
             // Top row
             HStack(spacing: 20) {
                 LinearGaugeView(
-                    label: topLeft.label,
-                    temperature: topLeft.temp,
+                    label: topLeftLabel,
+                    temperature: temperatureForQuadrant(topLeftLabel),
                     temperatureUnit: temperatureUnit
                 )
 
                 LinearGaugeView(
-                    label: topRight.label,
-                    temperature: topRight.temp,
+                    label: topRightLabel,
+                    temperature: temperatureForQuadrant(topRightLabel),
                     temperatureUnit: temperatureUnit
                 )
             }
@@ -101,14 +126,14 @@ struct SimpleView: View {
             // Bottom row
             HStack(spacing: 20) {
                 LinearGaugeView(
-                    label: bottomLeft.label,
-                    temperature: bottomLeft.temp,
+                    label: bottomLeftLabel,
+                    temperature: temperatureForQuadrant(bottomLeftLabel),
                     temperatureUnit: temperatureUnit
                 )
 
                 LinearGaugeView(
-                    label: bottomRight.label,
-                    temperature: bottomRight.temp,
+                    label: bottomRightLabel,
+                    temperature: temperatureForQuadrant(bottomRightLabel),
                     temperatureUnit: temperatureUnit
                 )
             }
@@ -133,6 +158,21 @@ struct SimpleView: View {
                     ForEach(TemperatureUnit.allCases) { unit in
                         Text(unit.rawValue).tag(unit)
                     }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Divider()
+
+            // Temperature reading mode
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Temperature Reading")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Picker("Reading", selection: $useMaxTemperature) {
+                    Text("Max").tag(true)
+                    Text("Center").tag(false)
                 }
                 .pickerStyle(.segmented)
             }
