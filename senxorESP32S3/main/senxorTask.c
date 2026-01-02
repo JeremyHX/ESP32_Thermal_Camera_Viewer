@@ -17,6 +17,7 @@
 #include "SenXor_Capturedata.h"		//Interrupt handler
 #include "senxorTask.h"
 #include "tcpServerTask.h"
+#include "cmdServerTask.h"
 #include "util.h"
 #include "ledCtrlTask.h"			//LED control task
 
@@ -86,31 +87,77 @@ void senxorTask(void * pvParameters)
 	ESP_LOGI(SXRTAG,MAIN_FREE_SPIRAM " / " MAIN_TOTAL_SPIRAM,heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_total_size(MALLOC_CAP_SPIRAM));				//Display the total amount of PSRAM
 
 	senxorTask_Init();																																					//Initialise queue
+
+	TickType_t lastPollTime = 0;
+
 	for(;;)
 	{
-		if ( (Acces_Read_Reg(0xB1) & B1_SINGLE_CONT) || (Acces_Read_Reg(0xB1) & B1_START_CAPTURE) )
-		{
-			DataFrameReceiveSenxor();													//Receive frame from SenXor
-			const uint16_t* senxorData = DataFrameGetPointer();							//Get processed frame
+		bool framePortConnected = tcpServerGetIsClientConnected();
+		bool cmdPortConnected = cmdServerGetIsClientConnected();
+		uint8_t pollFreq = cmdServerGetPollFreqHz();
 
-			if (senxorData != 0)
+		// Mode 1: Frame streaming port (3333) connected - normal streaming behavior
+		if (framePortConnected)
+		{
+			if ( (Acces_Read_Reg(0xB1) & B1_SINGLE_CONT) || (Acces_Read_Reg(0xB1) & B1_START_CAPTURE) )
 			{
-#ifdef CONFIG_MI_SENXOR_DBG
-				printSenXorLog(senxorData);
-#endif
-				memcpy(mSenxorFrameObj.mFrame,senxorData,sizeof(mSenxorFrameObj.mFrame));	//Get a copy of thermal frame
-				quadrant_Calculate(senxorData);												//Calculate quadrant analysis values
-				senxorFrame* pSenxorFrameObj = &mSenxorFrameObj;							//Create a pointer to the copy of thermal frame  for sending to queue
-				if(tcpServerGetIsClientConnected())
+				DataFrameReceiveSenxor();													//Receive frame from SenXor
+				const uint16_t* senxorData = DataFrameGetPointer();							//Get processed frame
+
+				if (senxorData != 0)
 				{
-					xQueueSend(senxorFrameQueue, (void *)&pSenxorFrameObj, 0);										//Send to queue and do not wait for queue
+#ifdef CONFIG_MI_SENXOR_DBG
+					printSenXorLog(senxorData);
+#endif
+					memcpy(mSenxorFrameObj.mFrame,senxorData,sizeof(mSenxorFrameObj.mFrame));	//Get a copy of thermal frame
+					quadrant_Calculate(senxorData);												//Calculate quadrant analysis values
+					senxorFrame* pSenxorFrameObj = &mSenxorFrameObj;							//Create a pointer to the copy of thermal frame  for sending to queue
+					xQueueSend(senxorFrameQueue, (void *)&pSenxorFrameObj, 0);					//Send to queue and do not wait for queue
+				}//End if
+				DataFrameProcess();															//Thermal frame post-processing
+			}//End if
+			vTaskDelay(1);
+		}
+		// Mode 2: Only command port (3334) connected with polling enabled
+		else if (cmdPortConnected && pollFreq > 0)
+		{
+			// Calculate delay based on poll frequency
+			TickType_t pollDelayMs = 1000 / pollFreq;
+			TickType_t currentTime = xTaskGetTickCount();
+
+			if ((currentTime - lastPollTime) >= pdMS_TO_TICKS(pollDelayMs))
+			{
+				lastPollTime = currentTime;
+
+				// Start capture temporarily if not already capturing
+				uint8_t prevB1 = Acces_Read_Reg(0xB1);
+				if (!(prevB1 & B1_SINGLE_CONT) && !(prevB1 & B1_START_CAPTURE))
+				{
+					Acces_Write_Reg(0xB1, 0x03);  // Start capture
 				}
 
-			}//End if
-			DataFrameProcess();															//Thermal frame post-processing
-		}//End if
+				DataFrameReceiveSenxor();
+				const uint16_t* senxorData = DataFrameGetPointer();
 
-		vTaskDelay(1);																	//A tiny delay to feed the watch dog
+				if (senxorData != 0)
+				{
+					quadrant_Calculate(senxorData);  // Update quadrant registers only
+				}
+				DataFrameProcess();
+
+				// Stop capture if we started it
+				if (!(prevB1 & B1_SINGLE_CONT) && !(prevB1 & B1_START_CAPTURE))
+				{
+					Acces_Write_Reg(0xB1, 0x00);  // Stop capture
+				}
+			}
+			vTaskDelay(1);
+		}
+		// Mode 3: Neither port connected, or cmd port connected but pollFreq = 0
+		else
+		{
+			vTaskDelay(pdMS_TO_TICKS(100));  // Sleep longer when idle
+		}
 	}//End for
 }//End senxorTask
 

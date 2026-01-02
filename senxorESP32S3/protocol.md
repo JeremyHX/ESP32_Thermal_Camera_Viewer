@@ -9,11 +9,20 @@ The ESP32 uses two separate TCP ports to prevent command responses from interfer
 | Port | Purpose | Description |
 |------|---------|-------------|
 | **3333** | Frame streaming | Thermal frames pushed automatically on connect |
-| **3334** | Commands | WREG/RREG/RRSE commands and responses |
+| **3334** | Commands | WREG/RREG/RRSE/POLL commands and responses |
 
-**Client should connect to both ports:**
-1. Connect to port 3333 to receive thermal frame stream
-2. Connect to port 3334 to send commands and receive responses
+**Connection Modes:**
+
+1. **Full streaming mode**: Connect to both ports
+   - Port 3333: Receive thermal frame stream
+   - Port 3334: Send commands and receive responses
+   - Quadrant registers updated on every frame automatically
+
+2. **Polling mode**: Connect to port 3334 only
+   - Send POLL command to set update frequency (1-25 Hz)
+   - Quadrant registers updated at specified frequency
+   - No frame data transmitted (lower bandwidth)
+   - Useful for headless operation or low-bandwidth scenarios
 
 ## Packet Format
 
@@ -147,6 +156,41 @@ Note: Quadrant registers return 4-byte values, others return 2-byte values.
 
 ---
 
+### POLL - Set Polling Frequency (Client → ESP32)
+
+Set the frequency at which the ESP32 reads thermal frames and updates quadrant registers when operating in polling mode (port 3334 only, without port 3333 connected).
+
+**Request**:
+```
+   #000APOLL[FF][CRC]
+```
+
+| Field | Size | Description |
+|-------|------|-------------|
+| FF | 2 bytes | Frequency in Hz (hex, 00-19) |
+
+**Frequency Values**:
+- `00` = Stop polling (default on connect)
+- `01` = 1 Hz
+- `19` = 25 Hz (maximum, camera limit)
+- Values > 25 (0x19) are capped to 25 Hz
+
+**Response** (when port 3333 NOT connected):
+```
+   #0008POLL[CRC]
+```
+
+**Response** (when port 3333 IS connected):
+No response - command is rejected. Use streaming mode instead.
+
+**Behavior**:
+- Only active when connected to port 3334 but NOT port 3333
+- When port 3333 is connected, frame streaming mode is used and POLL is ignored
+- Poll frequency resets to 0 on port 3334 disconnect
+- Quadrant registers (0xC2-0xC9) are updated silently at the specified rate
+
+---
+
 ## Register Map
 
 ### Control Registers
@@ -262,6 +306,30 @@ Ysplit├────────────┼──────────�
 **Response**:
 ```
    #000CRREGC0[Xsplit as 4 hex digits][CRC]
+```
+
+### Enable Polling at 5 Hz
+
+**Request**: Set poll frequency to 5 Hz (only on port 3334, without 3333 connected)
+```
+   #000APOLL05[CRC]
+```
+
+**Response**:
+```
+   #0008POLL[CRC]
+```
+
+### Stop Polling
+
+**Request**: Stop polling
+```
+   #000APOLL00[CRC]
+```
+
+**Response**:
+```
+   #0008POLL[CRC]
 ```
 
 ---

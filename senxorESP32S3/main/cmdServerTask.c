@@ -34,6 +34,7 @@ static int cmd_client_sock = -1;
 
 // Flags
 static volatile bool isClientConnected = false;
+static volatile uint8_t pollFreqHz = 0;  // Poll frequency in Hz (0 = stopped)
 
 // TCP keepalive settings
 static int keepAlive = 1;
@@ -48,6 +49,28 @@ static int keepCount = 3;
 bool cmdServerGetIsClientConnected(void)
 {
     return isClientConnected;
+}
+
+/******************************************************************************
+ * @brief       cmdServerGetPollFreqHz
+ * @return      Current poll frequency in Hz (0 = stopped)
+ *****************************************************************************/
+uint8_t cmdServerGetPollFreqHz(void)
+{
+    return pollFreqHz;
+}
+
+/******************************************************************************
+ * @brief       cmdServerSetPollFreqHz
+ * @param       freqHz - Poll frequency in Hz (0 = stop, capped at 25)
+ *****************************************************************************/
+void cmdServerSetPollFreqHz(uint8_t freqHz)
+{
+    if (freqHz > POLL_MAX_FREQ_HZ) {
+        freqHz = POLL_MAX_FREQ_HZ;
+    }
+    pollFreqHz = freqHz;
+    ESP_LOGI(CMDTAG, "Poll frequency set to %d Hz", pollFreqHz);
 }
 
 /******************************************************************************
@@ -143,6 +166,7 @@ static int cmdServerSend(const uint8_t* data, size_t len)
     if (err < 0) {
         ESP_LOGE(CMDTAG, "Send failed: errno %d", errno);
         isClientConnected = false;
+        pollFreqHz = 0;  // Reset poll frequency on disconnect
     }
     return err;
 }
@@ -164,10 +188,12 @@ static int cmdServerReceive(void)
     if (len < 0) {
         ESP_LOGE(CMDTAG, "Receive failed: errno %d", errno);
         isClientConnected = false;
+        pollFreqHz = 0;  // Reset poll frequency on disconnect
         return -1;
     } else if (len == 0) {
         ESP_LOGI(CMDTAG, "Command client disconnected");
         isClientConnected = false;
+        pollFreqHz = 0;  // Reset poll frequency on disconnect
         return -1;
     }
 

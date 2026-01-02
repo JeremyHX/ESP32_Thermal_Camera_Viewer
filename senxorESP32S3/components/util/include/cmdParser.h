@@ -19,6 +19,7 @@
 #define CMD_WPWD "WPWD"
 #define CMD_WMDE "WMDE"
 #define CMD_RRSE "RRSE"
+#define CMD_POLL "POLL"
 
 /* Data format definition*/
 #define EVK_CMD_START_CHAR 		'#'

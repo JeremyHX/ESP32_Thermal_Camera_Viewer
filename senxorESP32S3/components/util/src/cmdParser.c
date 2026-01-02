@@ -27,6 +27,10 @@ extern int ApplicationReadVersion (int Address);
 extern uint16_t quadrant_ReadRegister(uint8_t regAddr);
 extern void quadrant_WriteRegister(uint8_t regAddr, uint8_t value);
 
+// External functions for POLL command
+extern bool tcpServerGetIsClientConnected(void);
+extern void cmdServerSetPollFreqHz(uint8_t freqHz);
+
 // Helper to check if address is a quadrant register
 static inline bool isQuadrantRegister(int addr) {
 	return (addr >= REG_XSPLIT && addr <= REG_DCENTER);
@@ -448,6 +452,47 @@ uint8_t cmdParser_CommitCmd(const cmdPhaser* pCmdPhaser, uint8_t* pAckBuff)
 		sprintf((char *)&pAckBuff[j], "%04X", getCRC(pAckBuff+4,tAckLen));				// Add CRC
 
 		return tAckLen + 8;
+	}
+	else if (!strcmp((char*) pCmdPhaser->mCmd, CMD_POLL))
+	{
+		// POLL command: set polling frequency for quadrant register updates
+		// Only valid when frame port (3333) is NOT connected
+		if (tcpServerGetIsClientConnected()) {
+			// Reject: frame streaming is active, POLL not allowed
+			ESP_LOGW(CPTAG, "POLL rejected: frame port connected");
+			return 0;  // No ack sent
+		}
+
+		// Parse frequency from data (single byte hex, e.g., "01" for 1 Hz)
+		tVal[0] = pCmdPhaser->mData[0];
+		tVal[1] = pCmdPhaser->mData[1];
+		tVal[2] = 0;
+		tValInt = toHex((char*)tVal);
+
+		if (tValInt < 0) {
+			ESP_LOGE(CPTAG, "POLL: invalid frequency value");
+			return 0;
+		}
+
+		cmdServerSetPollFreqHz((uint8_t)tValInt);
+		printf("POLL frequency set to %d Hz\n", tValInt);
+
+		// Build ack:    #0008POLL[CRC]
+		pAckBuff[0]=' ';
+		pAckBuff[1]=' ';
+		pAckBuff[2]=' ';
+		pAckBuff[3]='#';
+		pAckBuff[4]='0';
+		pAckBuff[5]='0';
+		pAckBuff[6]='0';
+		pAckBuff[7]='8';
+		pAckBuff[8]='P';
+		pAckBuff[9]='O';
+		pAckBuff[10]='L';
+		pAckBuff[11]='L';
+		sprintf((char *)&pAckBuff[12], "%04X", getCRC(pAckBuff+4,8));
+		pAckBuff[16]=0;
+		return 17;
 	}
 	else
 	{

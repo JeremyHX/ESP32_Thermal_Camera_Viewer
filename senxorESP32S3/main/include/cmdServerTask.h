@@ -12,8 +12,11 @@
 
 #define CMD_SERVER_PORT         3334
 #define CMD_SERVER_STACK_SIZE   4096
+#define POLL_MAX_FREQ_HZ        25   // Camera max frame rate
 
 void cmdServerTask(void *pvParameters);
 bool cmdServerGetIsClientConnected(void);
+uint8_t cmdServerGetPollFreqHz(void);
+void cmdServerSetPollFreqHz(uint8_t freqHz);
 
 #endif /* MAIN_INCLUDE_CMDSERVERTASK_H_ */
