@@ -72,6 +72,13 @@ enum ThermalProtocol {
         return buildPacket(command: "RRSE", data: addrData + "FF")
     }
 
+    /// Build POLL command to set polling frequency (0-25 Hz)
+    static func buildPOLL(frequency: Int) -> Data {
+        let clampedFreq = max(0, min(25, frequency))
+        let freqHex = String(format: "%02X", clampedFreq)
+        return buildPacket(command: "POLL", data: freqHex)
+    }
+
     // MARK: - Packet Parsing
 
     /// Find the start of a protocol packet ("   #" pattern)

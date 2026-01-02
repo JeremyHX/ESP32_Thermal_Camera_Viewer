@@ -57,6 +57,13 @@ class CommandConnection {
         send(packet)
     }
 
+    /// Send POLL command to set ESP32 polling frequency (0-25 Hz)
+    /// Only effective when frame port (3333) is NOT connected
+    func sendPoll(frequency: Int) {
+        let packet = ThermalProtocol.buildPOLL(frequency: frequency)
+        send(packet)
+    }
+
     private func send(_ data: Data) {
         connection?.send(content: data, completion: .contentProcessed { error in
             if let error = error {

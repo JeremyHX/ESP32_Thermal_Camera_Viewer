@@ -3,6 +3,7 @@ import SwiftUI
 struct SimpleView: View {
     @Environment(ConnectionManager.self) private var connectionManager
     @State private var temperatureUnit: TemperatureUnit = .celsius
+    @State private var alertTracker = TemperatureAlertTracker()
 
     // Convert raw sensor values to Celsius
     private func toCelsius(_ raw: UInt16) -> Double {
@@ -21,12 +22,27 @@ struct SimpleView: View {
                 .background(Color(.systemBackground).opacity(0.95))
         }
         .background(Color.black)
+        .onChange(of: connectionManager.quadrantData.aMax) { _, newValue in
+            alertTracker.checkTemperature(quadrant: "A", temperature: toCelsius(newValue))
+        }
+        .onChange(of: connectionManager.quadrantData.bMax) { _, newValue in
+            alertTracker.checkTemperature(quadrant: "B", temperature: toCelsius(newValue))
+        }
+        .onChange(of: connectionManager.quadrantData.cMax) { _, newValue in
+            alertTracker.checkTemperature(quadrant: "C", temperature: toCelsius(newValue))
+        }
+        .onChange(of: connectionManager.quadrantData.dMax) { _, newValue in
+            alertTracker.checkTemperature(quadrant: "D", temperature: toCelsius(newValue))
+        }
+        .onDisappear {
+            alertTracker.reset()
+        }
     }
 
     private var gaugeGrid: some View {
         let quadrantData = connectionManager.quadrantData
 
-        return VStack(spacing: 50) {
+        return VStack(spacing: 200) {
             // Top row: A and B
             HStack(spacing: 20) {
                 LinearGaugeView(
@@ -83,6 +99,11 @@ struct SimpleView: View {
 
             Divider()
 
+            // Sound alerts toggle
+            soundAlertsToggle
+
+            Divider()
+
             // Legend
             legendView
 
@@ -92,6 +113,21 @@ struct SimpleView: View {
             disconnectButton
         }
         .padding()
+    }
+
+    private var soundAlertsToggle: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $alertTracker.soundAlertsEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sound Alerts")
+                        .font(.subheadline)
+                    Text("Plays at 180°C and 250°C")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+        }
     }
 
     private var statusHeader: some View {

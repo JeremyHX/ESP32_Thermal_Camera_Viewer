@@ -78,18 +78,32 @@ class ConnectionManager {
     }
 
     /// Enable or disable frame streaming while connected
+    /// When disabled, sends POLL 01 to start ESP32 polling at 1Hz
+    /// When enabled, sends POLL 00 to stop polling before reconnecting frame stream
     func setFrameStreamEnabled(_ enabled: Bool) {
         guard !host.isEmpty else { return }
 
         if enabled && !frameStreamEnabled {
-            frameConnection.connect(host: host)
+            // Exiting Simple view: stop polling, then connect frame stream
+            commandConnection.sendPoll(frequency: 0)
+            // Brief delay to ensure POLL command is processed before frame stream connects
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                guard let self = self else { return }
+                self.frameConnection.connect(host: self.host)
+                self.frameStreamEnabled = true
+            }
         } else if !enabled && frameStreamEnabled {
+            // Entering Simple view: disconnect frame stream, then start polling
             frameConnection.disconnect()
             currentFrame = nil
             frameCount = 0
             fps = 0
+            frameStreamEnabled = false
+            // Brief delay to ensure frame port is disconnected before sending POLL
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                self?.commandConnection.sendPoll(frequency: 1)
+            }
         }
-        frameStreamEnabled = enabled
     }
 
     // MARK: - Frame Handling
