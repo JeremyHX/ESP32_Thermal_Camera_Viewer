@@ -21,6 +21,9 @@
 #include "cmdServerTask.h"			//cmdServerTask (command handling)
 #include "usbSerialTask.h"			//usbSerialTask
 
+//BLE:
+#include "Drv_CombustionBle.h"		//Combustion-compatible BLE
+
 //public:
 MCU_REG MCU_REGISTER;
 
@@ -130,6 +133,7 @@ static void ESP32_Net_Init(void)
 #if (CONFIG_SOC_BT_SUPPORTED)
 #if (CONFIG_BT_ENABLED) && (CONFIG_BT_BLUEDROID_ENABLED) && (CONFIG_MI_BFI_EN)
 	Drv_BT_Init();									//Initialise Bluetooth for bluefi
+	combustionBle_Init();							//Initialise Combustion-compatible BLE
 #else
 	ESP_LOGE(MTAG,BT_ERR_NOT_ENABLED);
 #endif

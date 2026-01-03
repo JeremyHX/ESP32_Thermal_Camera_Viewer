@@ -20,6 +20,7 @@
 #include "cmdServerTask.h"
 #include "util.h"
 #include "ledCtrlTask.h"			//LED control task
+#include "Drv_CombustionBle.h"		//Combustion-compatible BLE
 
 //public:
 EXT_RAM_BSS_ATTR uint16_t CalibData_BufferData[CALIBDATA_FLASH_SIZE];			//Array to hold the calibration data
@@ -355,6 +356,15 @@ void quadrant_Calculate(const uint16_t* frameData)
 	mQuadrantData.Bburnert = imageData[mQuadrantData.Bburnery * SENXOR_FRAME_WIDTH + mQuadrantData.Bburnerx];
 	mQuadrantData.Cburnert = imageData[mQuadrantData.Cburnery * SENXOR_FRAME_WIDTH + mQuadrantData.Cburnerx];
 	mQuadrantData.Dburnert = imageData[mQuadrantData.Dburnery * SENXOR_FRAME_WIDTH + mQuadrantData.Dburnerx];
+
+	// Update Combustion BLE with latest temperatures
+	uint16_t combustion_temps[8] = {
+		mQuadrantData.Amax, mQuadrantData.Bmax,
+		mQuadrantData.Cmax, mQuadrantData.Dmax,
+		mQuadrantData.Aburnert, mQuadrantData.Bburnert,
+		mQuadrantData.Cburnert, mQuadrantData.Dburnert
+	};
+	combustionBle_UpdateTemps(combustion_temps);
 }
 
 /*

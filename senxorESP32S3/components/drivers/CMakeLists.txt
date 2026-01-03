@@ -5,6 +5,7 @@ message("================================================")
 idf_component_register(
 					SRCS "src/Drv_BT.c"
 					SRCS "src/Drv_BTSec.c"
+					SRCS "src/Drv_CombustionBle.c"
 					SRCS "src/Drv_Boot.c"
 					SRCS "src/Drv_CRC.c"
 					SRCS "src/DrvGPIO.c"
