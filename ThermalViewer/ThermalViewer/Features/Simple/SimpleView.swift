@@ -143,6 +143,11 @@ struct SimpleView: View {
 
     private var sidePanel: some View {
         VStack(spacing: 16) {
+            Image("VibeCuisine")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80)
+
             // Status header
             statusHeader
 
@@ -184,6 +189,11 @@ struct SimpleView: View {
 
             Divider()
 
+            // BLE auto-connect toggle
+            bleAutoConnectToggle
+
+            Divider()
+
             // Legend
             legendView
 
@@ -210,46 +220,54 @@ struct SimpleView: View {
         }
     }
 
+    private var bleAutoConnectToggle: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            @Bindable var cm = connectionManager
+            Toggle(isOn: $cm.bleAutoConnectEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Bluetooth Auto-Connect")
+                        .font(.subheadline)
+                    Text("Faster updates when available")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            .onChange(of: connectionManager.bleAutoConnectEnabled) { _, enabled in
+                connectionManager.setBLEAutoConnect(enabled)
+            }
+        }
+    }
+
     private var statusHeader: some View {
         VStack(spacing: 8) {
-            if connectionManager.connectionMode == .ble {
-                // BLE status
-                HStack {
-                    Circle()
-                        .fill(connectionManager.isConnected ? Color.green : Color.orange)
-                        .frame(width: 10, height: 10)
+            // Data source indicator
+            HStack {
+                Circle()
+                    .fill(connectionManager.isConnected ? Color.green : Color.red)
+                    .frame(width: 10, height: 10)
+
+                if connectionManager.usingBLEData {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .foregroundColor(.blue)
                     Text("Bluetooth")
                         .font(.headline)
-                    Spacer()
-                }
-
-                if let deviceName = connectionManager.bleDeviceName {
-                    Text(deviceName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Text("RSSI: \(connectionManager.bleRSSI) dBm")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text("Scanning...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else {
-                // WiFi status
-                HStack {
-                    Circle()
-                        .fill(connectionManager.commandConnection.state == .ready ? Color.green : Color.red)
-                        .frame(width: 10, height: 10)
-                    Text("Command Port")
+                    Image(systemName: "wifi")
+                        .foregroundColor(.green)
+                    Text("WiFi")
                         .font(.headline)
-                    Spacer()
                 }
+                Spacer()
+            }
 
+            // Show BLE device info if connected
+            if connectionManager.usingBLEData, let deviceName = connectionManager.bleDeviceName {
+                Text("\(deviceName) • \(connectionManager.bleRSSI) dBm")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if !connectionManager.usingBLEData {
                 Text("Polling every 1s")
                     .font(.caption)
                     .foregroundColor(.secondary)

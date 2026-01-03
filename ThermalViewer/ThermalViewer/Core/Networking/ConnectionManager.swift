@@ -1,11 +1,6 @@
 import Foundation
 import Network
 
-enum ConnectionMode {
-    case wifi
-    case ble
-}
-
 @Observable
 class ConnectionManager {
     let frameConnection = FrameStreamConnection()
@@ -18,7 +13,10 @@ class ConnectionManager {
     var frameCount: Int = 0
     var fps: Int = 0
     var frameStreamEnabled: Bool = false
-    var connectionMode: ConnectionMode = .wifi
+
+    // BLE hybrid mode settings
+    var bleAutoConnectEnabled: Bool = true
+    var usingBLEData: Bool = false
 
     // Display settings (shared across tabs)
     var flipHorizontally: Bool = false
@@ -28,32 +26,23 @@ class ConnectionManager {
     private var frameTimestamps: [Date] = []
     private var quadrantPollTimer: Timer?
     private var reconnectTask: Task<Void, Never>?
+    private var lastBLEUpdateTime: Date?
 
     var isConnected: Bool {
-        switch connectionMode {
-        case .wifi:
-            if frameStreamEnabled {
-                return frameConnection.state == .ready && commandConnection.state == .ready
-            } else {
-                return commandConnection.state == .ready
-            }
-        case .ble:
-            return bleManager.state == .connected || bleManager.state == .scanning && bleManager.discoveredDeviceName != nil
+        if frameStreamEnabled {
+            return frameConnection.state == .ready && commandConnection.state == .ready
+        } else {
+            return commandConnection.state == .ready
         }
     }
 
     var isConnecting: Bool {
-        switch connectionMode {
-        case .wifi:
-            let cmdConnecting = [.preparing, .setup].contains(where: { commandConnection.state == $0 })
-            if frameStreamEnabled {
-                let frameConnecting = [.preparing, .setup].contains(where: { frameConnection.state == $0 })
-                return frameConnecting || cmdConnecting
-            }
-            return cmdConnecting
-        case .ble:
-            return bleManager.state == .scanning && bleManager.discoveredDeviceName == nil
+        let cmdConnecting = [.preparing, .setup].contains(where: { commandConnection.state == $0 })
+        if frameStreamEnabled {
+            let frameConnecting = [.preparing, .setup].contains(where: { frameConnection.state == $0 })
+            return frameConnecting || cmdConnecting
         }
+        return cmdConnecting
     }
 
     var bleDeviceName: String? {
@@ -62,6 +51,10 @@ class ConnectionManager {
 
     var bleRSSI: Int {
         bleManager.rssi
+    }
+
+    var isBLEConnected: Bool {
+        bleManager.state == .connected || (bleManager.state == .scanning && bleManager.discoveredDeviceName != nil)
     }
 
     init() {
@@ -74,15 +67,23 @@ class ConnectionManager {
         }
 
         commandConnection.onQuadrantDataReceived = { [weak self] results in
-            self?.quadrantData.update(from: results)
+            guard let self = self else { return }
+            // Only use WiFi data if not receiving BLE data
+            if !self.usingBLEData {
+                self.quadrantData.update(from: results)
+            }
         }
 
         bleManager.onTemperaturesUpdated = { [weak self] in
-            self?.updateQuadrantDataFromBLE()
+            self?.handleBLEUpdate()
         }
     }
 
-    private func updateQuadrantDataFromBLE() {
+    private func handleBLEUpdate() {
+        // Mark that we're receiving BLE data
+        usingBLEData = true
+        lastBLEUpdateTime = Date()
+
         // Convert BLE temperatures (already in Celsius) to raw sensor values
         // Reverse of: celsius = raw * 0.0984 - 265.82
         // raw = (celsius + 265.82) / 0.0984
@@ -101,9 +102,8 @@ class ConnectionManager {
         quadrantData.dCenter = toRaw(bleManager.dCenter)
     }
 
-    /// Connect via WiFi with frame streaming enabled (for Advanced view)
+    /// Connect via WiFi
     func connect(to host: String, withFrameStream: Bool = true) {
-        connectionMode = .wifi
         self.host = host
         self.frameStreamEnabled = withFrameStream
         reconnectTask?.cancel()
@@ -119,44 +119,36 @@ class ConnectionManager {
             // If connecting without frame stream (Simple mode), send POLL to enable ESP32 polling
             if !withFrameStream {
                 self?.commandConnection.sendPoll(frequency: 1)
+                // Also start BLE scanning if enabled
+                self?.startBLEIfEnabled()
             }
         }
-    }
-
-    /// Connect via BLE (Simple mode only - no frame streaming)
-    func connectBLE() {
-        connectionMode = .ble
-        frameStreamEnabled = false
-        bleManager.startScanning()
     }
 
     func disconnect() {
         reconnectTask?.cancel()
         stopQuadrantPolling()
+        stopBLEScanning()
 
-        switch connectionMode {
-        case .wifi:
-            frameConnection.disconnect()
-            commandConnection.disconnect()
-        case .ble:
-            bleManager.disconnect()
-        }
+        frameConnection.disconnect()
+        commandConnection.disconnect()
 
         frameCount = 0
         fps = 0
         currentFrame = nil
         frameStreamEnabled = false
+        usingBLEData = false
     }
 
-    /// Enable or disable frame streaming while connected (WiFi mode only)
+    /// Enable or disable frame streaming while connected
     /// When disabled, sends POLL 01 to start ESP32 polling at 1Hz
     /// When enabled, sends POLL 00 to stop polling before reconnecting frame stream
     func setFrameStreamEnabled(_ enabled: Bool) {
-        // BLE mode doesn't support frame streaming
-        guard connectionMode == .wifi, !host.isEmpty else { return }
+        guard !host.isEmpty else { return }
 
         if enabled && !frameStreamEnabled {
-            // Exiting Simple view: stop polling, then connect frame stream
+            // Exiting Simple view: stop BLE, stop polling, then connect frame stream
+            stopBLEScanning()
             commandConnection.sendPoll(frequency: 0)
             // Brief delay to ensure POLL command is processed before frame stream connects
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -165,7 +157,7 @@ class ConnectionManager {
                 self.frameStreamEnabled = true
             }
         } else if !enabled && frameStreamEnabled {
-            // Entering Simple view: disconnect frame stream, then start polling
+            // Entering Simple view: disconnect frame stream, then start polling and BLE
             frameConnection.disconnect()
             currentFrame = nil
             frameCount = 0
@@ -174,7 +166,58 @@ class ConnectionManager {
             // Brief delay to ensure frame port is disconnected before sending POLL
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 self?.commandConnection.sendPoll(frequency: 1)
+                self?.startBLEIfEnabled()
             }
+        }
+    }
+
+    // MARK: - BLE Hybrid Mode
+
+    func startBLEIfEnabled() {
+        guard bleAutoConnectEnabled else { return }
+        guard bleManager.isBluetoothAvailable else { return }
+
+        bleManager.startScanning()
+
+        // Start a timer to detect BLE disconnection (no updates for 2 seconds)
+        startBLEWatchdog()
+    }
+
+    func stopBLEScanning() {
+        bleManager.disconnect()
+        usingBLEData = false
+        stopBLEWatchdog()
+    }
+
+    func setBLEAutoConnect(_ enabled: Bool) {
+        bleAutoConnectEnabled = enabled
+        if enabled && !frameStreamEnabled && isConnected {
+            startBLEIfEnabled()
+        } else if !enabled {
+            stopBLEScanning()
+        }
+    }
+
+    private var bleWatchdogTimer: Timer?
+
+    private func startBLEWatchdog() {
+        stopBLEWatchdog()
+        bleWatchdogTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.checkBLEConnection()
+        }
+    }
+
+    private func stopBLEWatchdog() {
+        bleWatchdogTimer?.invalidate()
+        bleWatchdogTimer = nil
+    }
+
+    private func checkBLEConnection() {
+        guard usingBLEData else { return }
+
+        // If no BLE update in 2 seconds, fall back to WiFi
+        if let lastUpdate = lastBLEUpdateTime, Date().timeIntervalSince(lastUpdate) > 2.0 {
+            usingBLEData = false
         }
     }
 

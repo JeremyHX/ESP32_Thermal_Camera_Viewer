@@ -88,19 +88,22 @@ class BLEManager: NSObject {
 
         for _ in 0..<8 {
             var rawValue: UInt16 = 0
-
+            
             for bit in 0..<13 {
                 let byteIndex = (bitPosition + bit) / 8
                 let bitInByte = 7 - ((bitPosition + bit) % 8)
-
+                
                 if byteIndex < data.count && (data[byteIndex] & (1 << bitInByte)) != 0 {
                     rawValue |= (1 << (12 - bit))
                 }
             }
             bitPosition += 13
-
+            
             // Convert to Celsius: (rawValue × 0.05) - 20
-            let celsius = (Double(rawValue) * 0.05) - 20.0        }
+            let celsius = (Double(rawValue) * 0.05) - 20.0
+            
+            temperatures.append(celsius)
+        }
 
         return temperatures
     }
