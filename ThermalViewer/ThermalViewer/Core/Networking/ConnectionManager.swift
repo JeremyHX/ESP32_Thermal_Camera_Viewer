@@ -15,12 +15,25 @@ class ConnectionManager {
     var frameStreamEnabled: Bool = false
 
     // BLE hybrid mode settings
-    var bleAutoConnectEnabled: Bool = true
+    var bleAutoConnectEnabled: Bool {
+        didSet { UserDefaults.standard.set(bleAutoConnectEnabled, forKey: "bleAutoConnectEnabled") }
+    }
     var usingBLEData: Bool = false
 
-    // Display settings (shared across tabs)
-    var flipHorizontally: Bool = false
-    var flipVertically: Bool = false
+    // Display settings (shared across tabs, persisted)
+    var flipHorizontally: Bool {
+        didSet { UserDefaults.standard.set(flipHorizontally, forKey: "flipHorizontally") }
+    }
+    var flipVertically: Bool {
+        didSet { UserDefaults.standard.set(flipVertically, forKey: "flipVertically") }
+    }
+
+    // Keys for UserDefaults
+    private enum DefaultsKey {
+        static let bleAutoConnect = "bleAutoConnectEnabled"
+        static let flipH = "flipHorizontally"
+        static let flipV = "flipVertically"
+    }
 
     private var fpsTimer: Timer?
     private var frameTimestamps: [Date] = []
@@ -58,6 +71,17 @@ class ConnectionManager {
     }
 
     init() {
+        // Load persisted preferences
+        let defaults = UserDefaults.standard
+        // Use object(forKey:) to check if value exists, default to true for bleAutoConnect
+        if defaults.object(forKey: DefaultsKey.bleAutoConnect) != nil {
+            self.bleAutoConnectEnabled = defaults.bool(forKey: DefaultsKey.bleAutoConnect)
+        } else {
+            self.bleAutoConnectEnabled = true
+        }
+        self.flipHorizontally = defaults.bool(forKey: DefaultsKey.flipH)
+        self.flipVertically = defaults.bool(forKey: DefaultsKey.flipV)
+
         setupCallbacks()
     }
 

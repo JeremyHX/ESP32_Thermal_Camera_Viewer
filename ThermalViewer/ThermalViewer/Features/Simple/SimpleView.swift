@@ -2,8 +2,8 @@ import SwiftUI
 
 struct SimpleView: View {
     @Environment(ConnectionManager.self) private var connectionManager
-    @State private var temperatureUnit: TemperatureUnit = .celsius
-    @State private var useMaxTemperature: Bool = true
+    @AppStorage("temperatureUnit") private var temperatureUnit: TemperatureUnit = .celsius
+    @AppStorage("useMaxTemperature") private var useMaxTemperature: Bool = true
     @State private var alertTracker = TemperatureAlertTracker()
 
     // Convert raw sensor values to Celsius
