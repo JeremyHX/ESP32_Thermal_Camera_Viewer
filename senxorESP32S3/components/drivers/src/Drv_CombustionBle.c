@@ -57,6 +57,11 @@ typedef struct {
 
 static combustion_state_t mState = {0};
 
+// Track initial advertising setup (only start advertising once during init)
+static bool initial_adv_setup_pending = false;
+static bool adv_data_configured = false;
+static bool scan_rsp_configured = false;
+
 // GATT attribute table
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t char_decl_uuid = ESP_GATT_UUID_CHAR_DECLARE;
@@ -122,23 +127,31 @@ static const esp_gatts_attr_db_t combustion_gatt_db[COMBUSTION_IDX_NB] = {
     },
 };
 
-// Advertising data with manufacturer specific data
-static uint8_t adv_manufacturer_data[24] = {0};
+// Raw advertising data (max 31 bytes)
+// Format: [len][type][data...]
+// - Flags: 3 bytes (len=2, type=0x01, flags)
+// - Manufacturer data: 27 bytes (len=26, type=0xFF, vendor_id + data)
+static uint8_t raw_adv_data[31] = {
+    // Flags (3 bytes)
+    0x02,  // Length
+    0x01,  // Type: Flags
+    0x06,  // Flags: LE General Discoverable | BR/EDR Not Supported
 
-static esp_ble_adv_data_t adv_data = {
-    .set_scan_rsp = false,
-    .include_name = false,
-    .include_txpower = false,
-    .min_interval = 0x0006,
-    .max_interval = 0x0010,
-    .appearance = 0x00,
-    .manufacturer_len = sizeof(adv_manufacturer_data),
-    .p_manufacturer_data = adv_manufacturer_data,
-    .service_data_len = 0,
-    .p_service_data = NULL,
-    .service_uuid_len = 0,
-    .p_service_uuid = NULL,
-    .flag = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
+    // Manufacturer Specific Data (up to 28 bytes: len + type + 26 data)
+    0x19,  // Length: 25 (type + 24 bytes data)
+    0xFF,  // Type: Manufacturer Specific Data
+    // Remaining 24 bytes filled by combustionBle_UpdateAdvData()
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+// Scan response with device name (shown in iPhone Settings)
+static uint8_t raw_scan_rsp_data[] = {
+    // Complete Local Name
+    0x0B,  // Length: 11 (type + 10 chars)
+    0x09,  // Type: Complete Local Name
+    'T', 'h', 'e', 'r', 'm', 'o', 'h', 'o', 'o', 'd',
 };
 
 static esp_ble_adv_params_t adv_params = {
@@ -163,12 +176,13 @@ static void combustionBle_StartAdvertising(void);
 static void combustionBle_SendNotifications(void);
 
 /*****************************************************************************
- * @brief  Encode millikelvin temperature to Combustion 13-bit format
+ * @brief  Encode decikelvin temperature to Combustion 13-bit format
+ * @param  temp_dk Temperature in decikelvin (1/10 K), e.g., 2973 = 297.3K = 24.15°C
  *****************************************************************************/
-static uint16_t combustionBle_EncodeTemp(uint16_t temp_mk)
+static uint16_t combustionBle_EncodeTemp(uint16_t temp_dk)
 {
-    // Convert millikelvin to Celsius: (temp_mk / 1000.0) - 273.15
-    float celsius = (temp_mk / 1000.0f) - 273.15f;
+    // Convert decikelvin to Celsius: (temp_dk / 10.0) - 273.15
+    float celsius = (temp_dk / 10.0f) - 273.15f;
 
     // Apply Combustion encoding: (celsius + 20.0) / 0.05
     float raw_float = (celsius + COMBUSTION_TEMP_OFFSET_C) / COMBUSTION_TEMP_SCALE_C;
@@ -223,38 +237,48 @@ static void combustionBle_UpdateAdvData(void)
         encoded[i] = combustionBle_EncodeTemp(mState.temps[i]);
     }
 
-    // Pack into manufacturer data
+    // Pack temperatures into 13 bytes
+    uint8_t packed_temps[13];
+    combustionBle_PackTemps(encoded, packed_temps);
+
+    // Update probe_status_value for GATT reads and notifications
+    // Format: 13 bytes of packed temps, then padding
+    memcpy(probe_status_value, packed_temps, 13);
+
+    // Manufacturer data starts at offset 5 in raw_adv_data (after flags and mfr header)
+    uint8_t *mfr_data = &raw_adv_data[5];
+
     // Offset 0-1: Vendor ID (little endian)
-    adv_manufacturer_data[0] = COMBUSTION_VENDOR_ID & 0xFF;
-    adv_manufacturer_data[1] = (COMBUSTION_VENDOR_ID >> 8) & 0xFF;
+    mfr_data[0] = COMBUSTION_VENDOR_ID & 0xFF;
+    mfr_data[1] = (COMBUSTION_VENDOR_ID >> 8) & 0xFF;
 
     // Offset 2: Product Type
-    adv_manufacturer_data[2] = COMBUSTION_PRODUCT_TYPE_THERMOHOOD;
+    mfr_data[2] = COMBUSTION_PRODUCT_TYPE_THERMOHOOD;
 
     // Offset 3-6: Serial Number (4 bytes from MAC)
-    adv_manufacturer_data[3] = (mState.serial_number >> 0) & 0xFF;
-    adv_manufacturer_data[4] = (mState.serial_number >> 8) & 0xFF;
-    adv_manufacturer_data[5] = (mState.serial_number >> 16) & 0xFF;
-    adv_manufacturer_data[6] = (mState.serial_number >> 24) & 0xFF;
+    mfr_data[3] = (mState.serial_number >> 0) & 0xFF;
+    mfr_data[4] = (mState.serial_number >> 8) & 0xFF;
+    mfr_data[5] = (mState.serial_number >> 16) & 0xFF;
+    mfr_data[6] = (mState.serial_number >> 24) & 0xFF;
 
     // Offset 7-19: Raw temperature data (13 bytes)
-    combustionBle_PackTemps(encoded, &adv_manufacturer_data[7]);
+    memcpy(&mfr_data[7], packed_temps, 13);
 
     // Offset 20: Mode/ID
-    adv_manufacturer_data[20] = 0x00;  // Normal mode
+    mfr_data[20] = 0x00;  // Normal mode
 
     // Offset 21: Battery/Virtual sensors
-    adv_manufacturer_data[21] = 0xFF;  // Full battery, no virtual sensors
+    mfr_data[21] = 0xFF;  // Full battery, no virtual sensors
 
     // Offset 22: Network info
-    adv_manufacturer_data[22] = 0x00;
+    mfr_data[22] = 0x00;
 
     // Offset 23: Overheating sensors
-    adv_manufacturer_data[23] = 0x00;  // No overheating
+    mfr_data[23] = 0x00;  // No overheating
 
     // Update advertising data if we're advertising
     if (mState.advertising) {
-        esp_ble_gap_config_adv_data(&adv_data);
+        esp_ble_gap_config_adv_data_raw(raw_adv_data, sizeof(raw_adv_data));
     }
 }
 
@@ -274,11 +298,25 @@ static void combustionBle_StartAdvertising(void)
         return;
     }
 
+    // If already advertising, just update the data without restarting
+    if (mState.advertising) {
+        // Advertising data is updated via combustionBle_UpdateAdvData()
+        return;
+    }
+
+    // Mark that we're starting initial advertising setup
+    initial_adv_setup_pending = true;
+    adv_data_configured = false;
+    scan_rsp_configured = false;
+
     // Connectable advertising
     adv_params.adv_type = ADV_TYPE_IND;
 
-    // Configure and start
-    esp_ble_gap_config_adv_data(&adv_data);
+    // Configure raw advertising data (contains manufacturer data with temps)
+    esp_ble_gap_config_adv_data_raw(raw_adv_data, sizeof(raw_adv_data));
+
+    // Configure scan response (contains device name)
+    esp_ble_gap_config_scan_rsp_data_raw(raw_scan_rsp_data, sizeof(raw_scan_rsp_data));
 }
 
 /*****************************************************************************
@@ -289,10 +327,6 @@ static void combustionBle_SendNotifications(void)
     if (mState.gatts_if == ESP_GATT_IF_NONE || mState.char_handle == 0) {
         return;
     }
-
-    // Build probe status packet (simplified - just temps for now)
-    // Real Combustion probe status is more complex, but temps in advertising
-    // is the primary data path
 
     for (int i = 0; i < COMBUSTION_MAX_CONNECTIONS; i++) {
         if (mState.clients[i].active && mState.clients[i].notifications_enabled) {
@@ -341,9 +375,29 @@ static void combustionBle_GapEventHandler(esp_gap_ble_cb_event_t event,
                                           esp_ble_gap_cb_param_t *param)
 {
     switch (event) {
+        case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
+            ESP_LOGD(COMBUSTION_TAG, "Raw advertising data set complete");
+            adv_data_configured = true;
+            // Only start advertising during initial setup, not on data updates
+            if (initial_adv_setup_pending && scan_rsp_configured) {
+                initial_adv_setup_pending = false;
+                esp_ble_gap_start_advertising(&adv_params);
+            }
+            break;
+
+        case ESP_GAP_BLE_SCAN_RSP_DATA_RAW_SET_COMPLETE_EVT:
+            ESP_LOGD(COMBUSTION_TAG, "Scan response data set complete");
+            scan_rsp_configured = true;
+            // Only start advertising during initial setup, not on data updates
+            if (initial_adv_setup_pending && adv_data_configured) {
+                initial_adv_setup_pending = false;
+                esp_ble_gap_start_advertising(&adv_params);
+            }
+            break;
+
         case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-            ESP_LOGD(COMBUSTION_TAG, "Advertising data set complete");
-            esp_ble_gap_start_advertising(&adv_params);
+            // Legacy handler (not used with raw data)
+            ESP_LOGD(COMBUSTION_TAG, "Advertising data set complete (legacy)");
             break;
 
         case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
@@ -508,6 +562,9 @@ esp_err_t combustionBle_Init(void)
 
     // Update advertising data with initial values
     combustionBle_UpdateAdvData();
+
+    // Set device name (also shown in some BLE scanners)
+    esp_ble_gap_set_device_name("Thermohood");
 
     // Register GAP callback (note: may conflict with BluFi's GAP handler)
     // We handle this by checking event types we care about

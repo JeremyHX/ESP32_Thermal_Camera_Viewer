@@ -66,7 +66,8 @@ esp_err_t combustionBle_Init(void);
  * @brief Update temperature values for BLE broadcast
  * @details Called from senxorTask after quadrant_Calculate() to update
  *          both advertising data and connected client notifications.
- * @param temps Array of 8 temperatures in millikelvin (mK)
+ * @param temps Array of 8 temperatures in decikelvin (dK = 1/10 K)
+ *              Example: 2973 = 297.3K = 24.15°C
  *              [0-3]: Amax, Bmax, Cmax, Dmax (quadrant max temps)
  *              [4-7]: Aburnert, Bburnert, Cburnert, Dburnert (burner temps)
  */

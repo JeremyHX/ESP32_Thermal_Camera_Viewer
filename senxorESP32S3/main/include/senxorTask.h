@@ -48,6 +48,14 @@
 #define REG_DBURNERY  0xD4
 #define REG_DBURNERT  0xD5
 
+// Device ID registers (BT MAC address, read-only)
+#define REG_DEVID0    0xE0
+#define REG_DEVID1    0xE1
+#define REG_DEVID2    0xE2
+#define REG_DEVID3    0xE3
+#define REG_DEVID4    0xE4
+#define REG_DEVID5    0xE5
+
 // Default split values
 #define DEFAULT_XSPLIT 40
 #define DEFAULT_YSPLIT 31

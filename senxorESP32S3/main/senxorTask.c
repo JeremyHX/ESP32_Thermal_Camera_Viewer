@@ -30,6 +30,7 @@ TaskHandle_t senxorTaskHandle = NULL;
 //private:
 EXT_RAM_BSS_ATTR static senxorFrame mSenxorFrameObj;
 static quadrantData_t mQuadrantData;  // Quadrant analysis data
+static uint8_t mDeviceId[6] = {0};    // BT MAC address for device identification
 static void senxorTask_Init(void);
 
 
@@ -97,6 +98,7 @@ void senxorTask(void * pvParameters)
 		bool framePortConnected = tcpServerGetIsClientConnected();
 		bool cmdPortConnected = cmdServerGetIsClientConnected();
 		uint8_t pollFreq = cmdServerGetPollFreqHz();
+		bool bleConnected = combustionBle_GetConnectionCount() > 0;
 
 		// Mode 1: Frame streaming port (3333) connected - normal streaming behavior
 		if (framePortConnected)
@@ -123,24 +125,29 @@ void senxorTask(void * pvParameters)
 			}//End if
 			vTaskDelay(1);
 		}
-		// Mode 2: Only command port (3334) connected with polling enabled
-		else if (cmdPortConnected && pollFreq > 0)
+		// Mode 2: Command port (3334) connected with polling enabled, OR BLE clients connected
+		else if ((cmdPortConnected && pollFreq > 0) || bleConnected)
 		{
 			// Start continuous capture if not already running
 			if (!pollCaptureStarted)
 			{
-				ESP_LOGI(SXRTAG, "Starting capture for polling mode at %d Hz", pollFreq);
+				if (bleConnected) {
+					ESP_LOGI(SXRTAG, "Starting capture for BLE mode (%d clients)", combustionBle_GetConnectionCount());
+				} else {
+					ESP_LOGI(SXRTAG, "Starting capture for polling mode at %d Hz", pollFreq);
+				}
 				Acces_Write_Reg(0xB1, 0x03);  // Start continuous capture
 				pollCaptureStarted = true;
 				lastPollTime = xTaskGetTickCount();  // Reset timer
 				vTaskDelay(pdMS_TO_TICKS(50));  // Give sensor time to start
 			}
 
-			// Calculate delay based on poll frequency
-			TickType_t pollDelayMs = 1;//1000 / pollFreq;
+			// Calculate delay based on poll frequency (use 25Hz for BLE if no poll freq set)
+			uint8_t effectiveFreq = (pollFreq > 0) ? pollFreq : 25;
+			TickType_t pollDelayMs = 1000 / effectiveFreq;
 			TickType_t currentTime = xTaskGetTickCount();
 
-			if ((currentTime - lastPollTime) >= pdMS_TO_TICKS(pollDelayMs))
+			if (1 || (currentTime - lastPollTime) >= pdMS_TO_TICKS(pollDelayMs))
 			{
 				lastPollTime = currentTime;
 
@@ -149,7 +156,7 @@ void senxorTask(void * pvParameters)
 
 				if (senxorData != 0)
 				{
-					quadrant_Calculate(senxorData);  // Update quadrant registers only
+					quadrant_Calculate(senxorData);  // Update quadrant registers and BLE
 					ESP_LOGD(SXRTAG, "Poll update: Amax=%u Dmax=%u",
 							 quadrant_ReadRegister(0xC2), quadrant_ReadRegister(0xC8));
 				}
@@ -157,13 +164,13 @@ void senxorTask(void * pvParameters)
 			}
 			vTaskDelay(1);
 		}
-		// Mode 3: Neither port connected, or cmd port connected but pollFreq = 0
+		// Mode 3: Neither port connected and no BLE clients
 		else
 		{
-			// Stop capture if we started it for polling
+			// Stop capture if we started it for polling/BLE
 			if (pollCaptureStarted)
 			{
-				ESP_LOGI(SXRTAG, "Stopping capture (polling inactive)");
+				ESP_LOGI(SXRTAG, "Stopping capture (no active clients)");
 				Acces_Write_Reg(0xB1, 0x00);  // Stop capture
 				pollCaptureStarted = false;
 			}
@@ -269,6 +276,9 @@ void quadrant_Init(void)
 	mQuadrantData.Cburnert = 0;
 	mQuadrantData.Dburnert = 0;
 
+	// Read BT MAC address for device identification
+	esp_read_mac(mDeviceId, ESP_MAC_BT);
+
 	ESP_LOGI(SXRTAG, "Quadrant analysis initialized: Xsplit=%d, Ysplit=%d",
 			 mQuadrantData.Xsplit, mQuadrantData.Ysplit);
 	ESP_LOGI(SXRTAG, "Burner coords: A(%d,%d) B(%d,%d) C(%d,%d) D(%d,%d)",
@@ -276,6 +286,9 @@ void quadrant_Init(void)
 			 mQuadrantData.Bburnerx, mQuadrantData.Bburnery,
 			 mQuadrantData.Cburnerx, mQuadrantData.Cburnery,
 			 mQuadrantData.Dburnerx, mQuadrantData.Dburnery);
+	ESP_LOGI(SXRTAG, "Device ID (BT MAC): %02X:%02X:%02X:%02X:%02X:%02X",
+			 mDeviceId[0], mDeviceId[1], mDeviceId[2],
+			 mDeviceId[3], mDeviceId[4], mDeviceId[5]);
 }
 
 /*
@@ -399,6 +412,13 @@ uint16_t quadrant_ReadRegister(uint8_t regAddr)
 		case REG_DBURNERX: return mQuadrantData.Dburnerx;
 		case REG_DBURNERY: return mQuadrantData.Dburnery;
 		case REG_DBURNERT: return mQuadrantData.Dburnert;
+		// Device ID registers (BT MAC address)
+		case REG_DEVID0:   return mDeviceId[0];
+		case REG_DEVID1:   return mDeviceId[1];
+		case REG_DEVID2:   return mDeviceId[2];
+		case REG_DEVID3:   return mDeviceId[3];
+		case REG_DEVID4:   return mDeviceId[4];
+		case REG_DEVID5:   return mDeviceId[5];
 		default:           return 0;
 	}
 }

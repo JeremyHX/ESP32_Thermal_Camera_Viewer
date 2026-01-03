@@ -245,6 +245,24 @@ Each quadrant has a configurable "burner" point with X/Y coordinates and a tempe
   - **D**: X ∈ [Xsplit, 79], Y ∈ [Ysplit, 61]
 - Default values are the center of each quadrant (with Xsplit=40, Ysplit=31)
 
+### Device ID Registers
+
+The device can be uniquely identified by its Bluetooth MAC address, available via registers `0xE0-0xE5`. This is the same MAC address used in BLE advertising, allowing clients to confirm they're communicating with the same device over both WiFi and Bluetooth.
+
+| Address | Name | R/W | Description |
+|---------|------|-----|-------------|
+| `0xE0` | DevID0 | R | BT MAC byte 0 (MSB) |
+| `0xE1` | DevID1 | R | BT MAC byte 1 |
+| `0xE2` | DevID2 | R | BT MAC byte 2 |
+| `0xE3` | DevID3 | R | BT MAC byte 3 |
+| `0xE4` | DevID4 | R | BT MAC byte 4 |
+| `0xE5` | DevID5 | R | BT MAC byte 5 (LSB) |
+
+**Example**: If the BT MAC is `D8:3B:DA:4A:2D:B6`, the registers return:
+- `0xE0` = `0xD8`, `0xE1` = `0x3B`, `0xE2` = `0xDA`, `0xE3` = `0x4A`, `0xE4` = `0x2D`, `0xE5` = `0xB6`
+
+**BLE Correlation**: The BLE advertising serial number uses the last 4 bytes (registers `0xE2-0xE5`) as a 32-bit value in little-endian format.
+
 ---
 
 ## Quadrant Layout

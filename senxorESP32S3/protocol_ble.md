@@ -26,7 +26,7 @@ The device advertises with manufacturer-specific data containing real-time tempe
 |--------|------|-------|-------------|
 | 0-1 | 2 | Vendor ID | `0xC7 0x09` (little-endian 0x09C7) |
 | 2 | 1 | Product Type | `0x04` (Thermohood) |
-| 3-6 | 4 | Serial Number | Device MAC address (last 4 bytes) |
+| 3-6 | 4 | Serial Number | BT MAC bytes 2-5 (little-endian), see [Device Identification](#device-identification) |
 | 7-19 | 13 | Temperature Data | 8 temperatures × 13 bits packed |
 | 20 | 1 | Mode/ID | `0x00` (normal mode) |
 | 21 | 1 | Battery/Virtual | `0xFF` (full battery, no virtual sensors) |
@@ -387,6 +387,39 @@ Ysplit├────────────┼──────────�
 
 ---
 
+## Device Identification
+
+The device can be uniquely identified by its Bluetooth MAC address. This allows clients to confirm they're communicating with the same physical device over both BLE and WiFi.
+
+### BLE Serial Number
+
+The 4-byte serial number in the advertising data (offset 3-6) contains the last 4 bytes of the BT MAC address in little-endian format.
+
+**Example**: For BT MAC `D8:3B:DA:4A:2D:B6`:
+- Serial bytes: `[0xB6, 0x2D, 0x4A, 0xDA]` (little-endian)
+- Serial as uint32: `0xDA4A2DB6`
+
+### WiFi/TCP Correlation
+
+The same BT MAC is available via TCP registers `0xE0-0xE5` (see protocol.md). To match a BLE device to a WiFi device:
+
+```swift
+// BLE: Extract serial from advertising data (offset 3-6, little-endian)
+let bleSerial = UInt32(mfrData[3]) | (UInt32(mfrData[4]) << 8) |
+                (UInt32(mfrData[5]) << 16) | (UInt32(mfrData[6]) << 24)
+
+// WiFi: Read registers 0xE2-0xE5 and construct same value
+let wifiSerial = UInt32(reg0xE2) << 24 | UInt32(reg0xE3) << 16 |
+                 UInt32(reg0xE4) << 8 | UInt32(reg0xE5)
+
+// Match if equal
+if bleSerial == wifiSerial {
+    // Same device
+}
+```
+
+---
+
 ## Notes
 
 - Temperature values are updated on every thermal frame (~25 Hz)
@@ -394,4 +427,4 @@ Ysplit├────────────┼──────────�
 - The device can be monitored passively (no connection) or actively (with connection)
 - Passive monitoring via advertising is recommended for battery-powered clients
 - All temperature values are in Celsius
-- Raw sensor values from the thermal camera are in millikelvin (mK) internally
+- Raw sensor values from the thermal camera are in decikelvin (dK) internally
