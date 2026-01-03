@@ -14,8 +14,9 @@ struct ConnectionView: View {
             // App icon/title
             VStack(spacing: 16) {
                 Image("VibeCuisine")
-                    .font(.system(size: 80))
-                    .foregroundColor(.cyan)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
 
                 Text("Thermal Viewer")
                     .font(.largeTitle)
