@@ -212,19 +212,49 @@ struct SimpleView: View {
 
     private var statusHeader: some View {
         VStack(spacing: 8) {
-            HStack {
-                Circle()
-                    .fill(connectionManager.commandConnection.state == .ready ? Color.green : Color.red)
-                    .frame(width: 10, height: 10)
-                Text("Command Port")
-                    .font(.headline)
-                Spacer()
-            }
+            if connectionManager.connectionMode == .ble {
+                // BLE status
+                HStack {
+                    Circle()
+                        .fill(connectionManager.isConnected ? Color.green : Color.orange)
+                        .frame(width: 10, height: 10)
+                    Text("Bluetooth")
+                        .font(.headline)
+                    Spacer()
+                }
 
-            Text("Polling every 1s")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                if let deviceName = connectionManager.bleDeviceName {
+                    Text(deviceName)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("RSSI: \(connectionManager.bleRSSI) dBm")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("Scanning...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                // WiFi status
+                HStack {
+                    Circle()
+                        .fill(connectionManager.commandConnection.state == .ready ? Color.green : Color.red)
+                        .frame(width: 10, height: 10)
+                    Text("Command Port")
+                        .font(.headline)
+                    Spacer()
+                }
+
+                Text("Polling every 1s")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 

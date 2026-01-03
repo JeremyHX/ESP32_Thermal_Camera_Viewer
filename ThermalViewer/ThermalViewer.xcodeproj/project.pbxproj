@@ -23,6 +23,7 @@
 		A100000000000010 /* SimpleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000010 /* SimpleView.swift */; };
 		A100000000000011 /* LinearGaugeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000011 /* LinearGaugeView.swift */; };
 		A100000000000012 /* SoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000012 /* SoundManager.swift */; };
+		A100000000000013 /* BLEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000013 /* BLEManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +45,7 @@
 		A200000000000010 /* SimpleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleView.swift; sourceTree = "<group>"; };
 		A200000000000011 /* LinearGaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinearGaugeView.swift; sourceTree = "<group>"; };
 		A200000000000012 /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
+		A200000000000013 /* BLEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +113,7 @@
 				A200000000000005 /* FrameStreamConnection.swift */,
 				A200000000000006 /* CommandConnection.swift */,
 				A200000000000007 /* ConnectionManager.swift */,
+				A200000000000013 /* BLEManager.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -253,6 +256,7 @@
 				A100000000000010 /* SimpleView.swift in Sources */,
 				A100000000000011 /* LinearGaugeView.swift in Sources */,
 				A100000000000012 /* SoundManager.swift in Sources */,
+				A100000000000013 /* BLEManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

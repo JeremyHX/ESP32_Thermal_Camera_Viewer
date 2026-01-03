@@ -1,10 +1,16 @@
 import Foundation
 import Network
 
+enum ConnectionMode {
+    case wifi
+    case ble
+}
+
 @Observable
 class ConnectionManager {
     let frameConnection = FrameStreamConnection()
     let commandConnection = CommandConnection()
+    let bleManager = BLEManager()
     let quadrantData = QuadrantData()
 
     var host: String = ""
@@ -12,6 +18,7 @@ class ConnectionManager {
     var frameCount: Int = 0
     var fps: Int = 0
     var frameStreamEnabled: Bool = false
+    var connectionMode: ConnectionMode = .wifi
 
     // Display settings (shared across tabs)
     var flipHorizontally: Bool = false
@@ -23,20 +30,38 @@ class ConnectionManager {
     private var reconnectTask: Task<Void, Never>?
 
     var isConnected: Bool {
-        if frameStreamEnabled {
-            return frameConnection.state == .ready && commandConnection.state == .ready
-        } else {
-            return commandConnection.state == .ready
+        switch connectionMode {
+        case .wifi:
+            if frameStreamEnabled {
+                return frameConnection.state == .ready && commandConnection.state == .ready
+            } else {
+                return commandConnection.state == .ready
+            }
+        case .ble:
+            return bleManager.state == .connected || bleManager.state == .scanning && bleManager.discoveredDeviceName != nil
         }
     }
 
     var isConnecting: Bool {
-        let cmdConnecting = [.preparing, .setup].contains(where: { commandConnection.state == $0 })
-        if frameStreamEnabled {
-            let frameConnecting = [.preparing, .setup].contains(where: { frameConnection.state == $0 })
-            return frameConnecting || cmdConnecting
+        switch connectionMode {
+        case .wifi:
+            let cmdConnecting = [.preparing, .setup].contains(where: { commandConnection.state == $0 })
+            if frameStreamEnabled {
+                let frameConnecting = [.preparing, .setup].contains(where: { frameConnection.state == $0 })
+                return frameConnecting || cmdConnecting
+            }
+            return cmdConnecting
+        case .ble:
+            return bleManager.state == .scanning && bleManager.discoveredDeviceName == nil
         }
-        return cmdConnecting
+    }
+
+    var bleDeviceName: String? {
+        bleManager.discoveredDeviceName
+    }
+
+    var bleRSSI: Int {
+        bleManager.rssi
     }
 
     init() {
@@ -51,10 +76,34 @@ class ConnectionManager {
         commandConnection.onQuadrantDataReceived = { [weak self] results in
             self?.quadrantData.update(from: results)
         }
+
+        bleManager.onTemperaturesUpdated = { [weak self] in
+            self?.updateQuadrantDataFromBLE()
+        }
     }
 
-    /// Connect with frame streaming enabled (for Advanced view)
+    private func updateQuadrantDataFromBLE() {
+        // Convert BLE temperatures (already in Celsius) to raw sensor values
+        // Reverse of: celsius = raw * 0.0984 - 265.82
+        // raw = (celsius + 265.82) / 0.0984
+        func toRaw(_ celsius: Double) -> UInt16 {
+            let raw = (celsius + 265.82) / 0.0984
+            return UInt16(max(0, min(65535, raw)))
+        }
+
+        quadrantData.aMax = toRaw(bleManager.aMax)
+        quadrantData.aCenter = toRaw(bleManager.aCenter)
+        quadrantData.bMax = toRaw(bleManager.bMax)
+        quadrantData.bCenter = toRaw(bleManager.bCenter)
+        quadrantData.cMax = toRaw(bleManager.cMax)
+        quadrantData.cCenter = toRaw(bleManager.cCenter)
+        quadrantData.dMax = toRaw(bleManager.dMax)
+        quadrantData.dCenter = toRaw(bleManager.dCenter)
+    }
+
+    /// Connect via WiFi with frame streaming enabled (for Advanced view)
     func connect(to host: String, withFrameStream: Bool = true) {
+        connectionMode = .wifi
         self.host = host
         self.frameStreamEnabled = withFrameStream
         reconnectTask?.cancel()
@@ -74,22 +123,37 @@ class ConnectionManager {
         }
     }
 
+    /// Connect via BLE (Simple mode only - no frame streaming)
+    func connectBLE() {
+        connectionMode = .ble
+        frameStreamEnabled = false
+        bleManager.startScanning()
+    }
+
     func disconnect() {
         reconnectTask?.cancel()
         stopQuadrantPolling()
-        frameConnection.disconnect()
-        commandConnection.disconnect()
+
+        switch connectionMode {
+        case .wifi:
+            frameConnection.disconnect()
+            commandConnection.disconnect()
+        case .ble:
+            bleManager.disconnect()
+        }
+
         frameCount = 0
         fps = 0
         currentFrame = nil
         frameStreamEnabled = false
     }
 
-    /// Enable or disable frame streaming while connected
+    /// Enable or disable frame streaming while connected (WiFi mode only)
     /// When disabled, sends POLL 01 to start ESP32 polling at 1Hz
     /// When enabled, sends POLL 00 to stop polling before reconnecting frame stream
     func setFrameStreamEnabled(_ enabled: Bool) {
-        guard !host.isEmpty else { return }
+        // BLE mode doesn't support frame streaming
+        guard connectionMode == .wifi, !host.isEmpty else { return }
 
         if enabled && !frameStreamEnabled {
             // Exiting Simple view: stop polling, then connect frame stream
